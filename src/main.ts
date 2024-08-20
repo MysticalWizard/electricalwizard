@@ -1,5 +1,7 @@
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
+import chalk from 'chalk';
 import config from '@/config.js';
+import { dbService } from '@/services/database.js';
 import { loadCommands, loadEvents } from '@/utils/loaders.js';
 
 /**
@@ -15,7 +17,21 @@ const client = new Client({
 
 client.commands = new Collection();
 
-loadCommands(client);
-loadEvents(client);
+async function main() {
+  try {
+    console.log(chalk.cyanBright(':: INITIALIZING BOT ::'));
 
-client.login(config.bot.token);
+    await dbService.connect();
+
+    loadCommands(client);
+    loadEvents(client);
+
+    await client.login(config.bot.token);
+  } catch (error) {
+    console.error('Failed to start the bot:', error);
+    await dbService.disconnect();
+    process.exit(1);
+  }
+}
+
+main();
