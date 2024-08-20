@@ -4,7 +4,7 @@ import { SlashCommand } from '@/types';
 declare module 'discord.js' {
   export interface Client {
     /**
-     * A collection of slash commands available the bot.
+     * A collection of slash commands available to the bot.
      *
      * This property extends the Discord.js Client to include a collection
      * of SlashCommand objects, allowing easy access to all registered
