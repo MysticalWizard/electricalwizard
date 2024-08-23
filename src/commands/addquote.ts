@@ -88,10 +88,11 @@ const command: SlashCommand = {
 
       await newQuote.save();
 
+      const quoteCount = await QuoteModel.countDocuments();
       const formattedQuote = `“${quoteContent}” — ${author}${context ? `, ${context}` : ''}, ${year}`;
 
       await interaction.editReply(
-        `Quote #${newQuote._id} added.\nFormatted quote: ${formattedQuote}`,
+        `Quote #${quoteCount} added!\nFormatted quote: ${formattedQuote}`,
       );
     } catch (error) {
       console.error('Error adding quote:', error);

@@ -4,6 +4,7 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import StatusModel from '@/models/Status.js';
+import UserModel from '@/models/User.js';
 import { SlashCommand } from '@/types';
 
 const command: SlashCommand = {
@@ -26,11 +27,24 @@ const command: SlashCommand = {
     const newStatus = interaction.options.getString('message', true);
 
     try {
+      // Find or create the user in the UserModel
+      const user = await UserModel.findOneAndUpdate(
+        { userId: interaction.user.id },
+        { username: interaction.user.username },
+        { upsert: true, new: true },
+      );
+
+      // Update the status
       await StatusModel.findOneAndUpdate(
         {},
-        { message: newStatus },
+        {
+          message: newStatus,
+          updatedAt: new Date(),
+          updatedBy: user._id, // Reference to the User document
+        },
         { upsert: true },
       );
+
       await interaction.client.user?.setActivity(newStatus);
       await interaction.reply(`Bot status updated to: ${newStatus}`);
     } catch (error) {
