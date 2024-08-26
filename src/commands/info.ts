@@ -8,7 +8,9 @@ const command: SlashCommand = {
   execute: async (interaction: ChatInputCommandInteraction) => {
     const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
     const version = packageJson.version;
-    await interaction.reply(`ElectricalWizard Discord Bot (Version: ${version})`);
+    await interaction.reply(
+      `ElectricalWizard Discord Bot (Version: ${version})`,
+    );
   },
 };
 
