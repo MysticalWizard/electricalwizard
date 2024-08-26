@@ -2,6 +2,7 @@ import { ActivityType, Client, Events } from 'discord.js';
 import chalk from 'chalk';
 import config from '@/config.js';
 import StatusModel from '@/models/Status.js';
+import { createBirthdayService } from '@/services/birthday.js';
 import { Event } from '@/types';
 
 const event: Event<Events.ClientReady> = {
@@ -31,6 +32,15 @@ const event: Event<Events.ClientReady> = {
         type: ActivityType.Custom,
       });
     }
+
+    // Start the birthday check service
+    try {
+      const birthdayService = createBirthdayService(client);
+      birthdayService.startBirthdayCheck(60);
+    } catch (error) {
+      console.error('Error starting birthday check service:', error);
+    }
+
     console.log(chalk.green(':: READY! ::'));
   },
 };

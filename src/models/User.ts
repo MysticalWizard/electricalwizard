@@ -12,6 +12,7 @@ export interface IUser extends Document {
   };
   nicknames: string[];
   birthday: Date;
+  birthdayTimezone: number;
   save(options?: SaveOptions): Promise<this>;
 }
 
@@ -27,6 +28,7 @@ const UserSchema = new Schema({
   },
   nicknames: [{ type: String }],
   birthday: { type: Date },
+  birthdayTimezone: { type: Number, default: 0 }, // Default to UTC
 });
 
 const UserModel = model<IUser>('User', UserSchema);
