@@ -22,10 +22,10 @@ interface QuoteWithRelevance extends IQuote {
   relevance: number;
 }
 
-const quoteCommands: SlashCommand = {
+const command: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('quote')
-    .setDescription('Retrieve or search for quotes')
+    .setDescription('Get a random quote or search for a quote')
     .addSubcommand((subcommand) =>
       subcommand
         .setName('random')
@@ -89,27 +89,32 @@ const quoteCommands: SlashCommand = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const subcommand = interaction.options.getSubcommand();
-    const n = interaction.options.getInteger('count') || 1;
+    const count = interaction.options.getInteger('count') || 1;
 
     if (subcommand === 'random') {
-      await handleRandomCommand(interaction, n);
+      await handleRandomCommand(interaction, count);
     } else if (subcommand === 'search') {
-      await handleSearchCommand(interaction, n);
+      await handleSearchCommand(interaction, count);
     }
   },
 };
 
+/**
+ * Handles autocomplete for the quote search command
+ * @param interaction - The autocomplete interaction
+ * @param focusedOption - The option currently being typed by the user
+ */
 async function handleSearchAutocomplete(
   interaction: AutocompleteInteraction,
   focusedOption: { name: string; value: string },
-) {
+): Promise<void> {
   const author = interaction.options.getString('author')?.toLowerCase();
   const year = interaction.options.getInteger('year');
   const query: Record<string, unknown> = {};
   if (author) query.author = new RegExp(author, 'i');
   if (year) query.year = year;
 
-  let choices: { name: string; value: string | number }[] = [];
+  let choices: { name: string; value: string | number }[];
 
   switch (focusedOption.name) {
     case 'content':
@@ -121,6 +126,8 @@ async function handleSearchAutocomplete(
     case 'year':
       choices = await getYearChoices(query, focusedOption.value);
       break;
+    default:
+      choices = [];
   }
 
   await interaction.respond(
@@ -214,7 +221,13 @@ async function getYearChoices(
   }
 }
 
-async function handleRandomAutocomplete(interaction: AutocompleteInteraction) {
+/**
+ * Handles autocomplete for the quote random command
+ * @param interaction - The autocomplete interaction
+ */
+async function handleRandomAutocomplete(
+  interaction: AutocompleteInteraction,
+): Promise<void> {
   const totalQuotes = await QuoteModel.countDocuments();
   const choices: { name: string; value: number }[] = [];
 
@@ -401,4 +414,4 @@ async function formatSearchResults(
     .join('\n\n');
 }
 
-export default quoteCommands;
+export default command;
