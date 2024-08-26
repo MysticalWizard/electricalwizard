@@ -23,6 +23,10 @@ async function handleMessageCommands(message: Message): Promise<void> {
   if (content === 'quote' && message.reference) {
     await handleQuoteCommand(message);
   }
+
+  if (content.startsWith('meow')) {
+    await message.reply('meow :3');
+  }
 }
 
 async function handleQuoteCommand(message: Message): Promise<void> {
