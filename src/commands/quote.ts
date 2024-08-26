@@ -3,236 +3,402 @@ import {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
 } from 'discord.js';
-import QuoteModel from '@/models/Quote.js';
+import QuoteModel, { IQuote } from '@/models/Quote.js';
 import { SlashCommand } from '@/types';
 
-const command: SlashCommand = {
+// Configuration
+const CONFIG = {
+  MAX_SEARCH_RESULTS: 5,
+  LEVENSHTEIN_DISTANCE_THRESHOLD: 2,
+  AUTOCOMPLETE_LIMIT: 25,
+  RELEVANCY_WEIGHTS: {
+    exactMatch: 10,
+    partialMatch: 5,
+    fuzzyMatch: 3,
+  },
+};
+
+interface QuoteWithRelevance extends IQuote {
+  relevance: number;
+}
+
+const quoteCommands: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('quote')
     .setDescription('Retrieve or search for quotes')
-    .addIntegerOption((option) =>
-      option
-        .setName('id')
-        .setDescription('ID of the quote to retrieve (n-th entry)')
-        .setMinValue(1)
-        .setAutocomplete(true),
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('random')
+        .setDescription('Retrieve random quotes or a quote by ID')
+        .addIntegerOption((option) =>
+          option
+            .setName('id')
+            .setDescription('ID of the quote to retrieve (n-th entry)')
+            .setMinValue(1)
+            .setAutocomplete(true),
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName('count')
+            .setDescription('Number of random quotes to retrieve (1-5)')
+            .setMinValue(1)
+            .setMaxValue(CONFIG.MAX_SEARCH_RESULTS),
+        ),
     )
-    .addStringOption((option) =>
-      option
-        .setName('content')
-        .setDescription('Search for quotes containing this text')
-        .setAutocomplete(true),
-    )
-    .addStringOption((option) =>
-      option
-        .setName('author')
-        .setDescription('Search for quotes by this author')
-        .setAutocomplete(true),
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName('year')
-        .setDescription('Search for quotes from this year')
-        .setAutocomplete(true),
-    )
-    .addIntegerOption((option) =>
-      option
-        .setName('n')
-        .setDescription('Number of random quotes to retrieve (1-10)')
-        .setMinValue(1)
-        .setMaxValue(10),
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName('search')
+        .setDescription('Search for quotes by content, author, or year')
+        .addStringOption((option) =>
+          option
+            .setName('content')
+            .setDescription('Search for quotes containing this text')
+            .setAutocomplete(true),
+        )
+        .addStringOption((option) =>
+          option
+            .setName('author')
+            .setDescription('Search for quotes by this author')
+            .setAutocomplete(true),
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName('year')
+            .setDescription('Search for quotes from this year')
+            .setAutocomplete(true),
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName('count')
+            .setDescription('Number of quotes to retrieve (1-5)')
+            .setMinValue(1)
+            .setMaxValue(CONFIG.MAX_SEARCH_RESULTS),
+        ),
     ) as SlashCommandBuilder,
 
   async autocomplete(interaction: AutocompleteInteraction) {
+    const subcommand = interaction.options.getSubcommand();
     const focusedOption = interaction.options.getFocused(true);
-    const otherOptions = interaction.options.data.filter(
-      (option) => option.name !== focusedOption.name,
-    );
 
-    let choices: { name: string; value: string | number }[] = [];
-
-    const query: Record<string, unknown> = {};
-    const totalCount = await QuoteModel.countDocuments(query);
-    otherOptions.forEach((option) => {
-      if (option.value) {
-        if (option.name === 'content' || option.name === 'author') {
-          query[option.name] = new RegExp(option.value as string, 'i');
-        } else {
-          query[option.name] = option.value;
-        }
-      }
-    });
-
-    try {
-      switch (focusedOption.name) {
-        case 'id':
-          if (focusedOption.value === '') {
-            const oldestQuotes = await QuoteModel.find(query)
-              .sort({ _id: 1 })
-              .limit(25)
-              .lean();
-            choices = oldestQuotes.map((quote, index) => ({
-              name: `${index + 1}: ${quote.quote.substring(0, 50)}...`,
-              value: index + 1,
-            }));
-          } else {
-            const entryNumber = parseInt(focusedOption.value as string);
-            if (!isNaN(entryNumber) && entryNumber <= totalCount) {
-              const matchingQuote = await QuoteModel.findOne(query)
-                .skip(entryNumber - 1)
-                .limit(1)
-                .lean();
-              if (matchingQuote) {
-                choices = [
-                  {
-                    name: `${entryNumber}: ${matchingQuote.quote.substring(0, 50)}...`,
-                    value: entryNumber,
-                  },
-                ];
-              }
-            }
-          }
-          break;
-
-        case 'content':
-          if (focusedOption.value === '') {
-            const randomQuotes = await QuoteModel.aggregate([
-              { $match: query },
-              { $sample: { size: 25 } },
-            ]);
-            choices = randomQuotes.map((quote) => ({
-              name: quote.quote.substring(0, 100),
-              value: quote.quote,
-            }));
-          } else {
-            query.quote = new RegExp(focusedOption.value as string, 'i');
-            const matchingQuotes = await QuoteModel.find(query)
-              .limit(25)
-              .lean();
-            choices = matchingQuotes.map((quote) => ({
-              name: quote.quote.substring(0, 100),
-              value: quote.quote,
-            }));
-          }
-          break;
-
-        case 'author':
-          if (focusedOption.value === '') {
-            const popularAuthors = await QuoteModel.aggregate([
-              { $match: query },
-              { $group: { _id: '$author', count: { $sum: 1 } } },
-              { $sort: { count: -1 } },
-              { $limit: 25 },
-            ]);
-            choices = popularAuthors.map((author) => ({
-              name: `${author._id} (${author.count} quotes)`,
-              value: author._id,
-            }));
-          } else {
-            query.author = new RegExp(focusedOption.value as string, 'i');
-            const matchingAuthors = await QuoteModel.distinct('author', query);
-            choices = matchingAuthors.slice(0, 25).map((author) => ({
-              name: author,
-              value: author,
-            }));
-          }
-          break;
-
-        case 'year':
-          if (focusedOption.value === '') {
-            const popularYears = await QuoteModel.aggregate([
-              { $match: query },
-              { $group: { _id: '$year', count: { $sum: 1 } } },
-              { $sort: { _id: -1 } },
-              { $limit: 25 },
-            ]);
-            choices = popularYears
-              .filter(
-                (year): year is { _id: number; count: number } =>
-                  typeof year._id === 'number' && year._id !== null,
-              )
-              .map((year) => ({
-                name: `${year._id} (${year.count} quotes)`,
-                value: year._id,
-              }));
-          } else {
-            const yearValue = parseInt(focusedOption.value as string);
-            if (!isNaN(yearValue)) {
-              query.year = yearValue;
-              const matchingYears = await QuoteModel.distinct('year', query);
-              choices = matchingYears
-                .filter(
-                  (year): year is number =>
-                    typeof year === 'number' && year !== null,
-                )
-                .slice(0, 25)
-                .map((year) => ({
-                  name: year.toString(),
-                  value: year,
-                }));
-            }
-          }
-          break;
-      }
-
-      await interaction.respond(
-        choices.length > 0
-          ? choices
-          : [{ name: 'No matching entries found', value: 'not_found' }],
-      );
-    } catch (error) {
-      console.error('Error in autocomplete:', error);
-      await interaction.respond([{ name: 'Error occurred', value: 'error' }]);
+    if (subcommand === 'random' && focusedOption.name === 'id') {
+      await handleRandomAutocomplete(interaction);
+    } else if (subcommand === 'search') {
+      await handleSearchAutocomplete(interaction, focusedOption);
     }
   },
 
   async execute(interaction: ChatInputCommandInteraction) {
-    const n = interaction.options.getInteger('n') || 1;
-    const id = interaction.options.getInteger('id');
-    const content = interaction.options.getString('content');
-    const author = interaction.options.getString('author');
-    const year = interaction.options.getInteger('year');
+    const subcommand = interaction.options.getSubcommand();
+    const n = interaction.options.getInteger('count') || 1;
 
-    const formatQuote = (q: typeof QuoteModel.prototype) => {
-      const quoteString = `"${q.quote}"`;
-      const authorString = `${q.author}`;
-      const contextString = q.context ? `, ${q.context}` : '';
-      const yearString = q.year ? `, ${q.year}` : '';
-
-      return `${quoteString} — ${authorString}${contextString}${yearString}`;
-    };
-
-    let quotes;
-
-    // Check if any search options are provided
-    if (id || content || author || year) {
-      const query: Record<string, unknown> = {};
-      if (id) {
-        quotes = [await QuoteModel.findOne().skip(id - 1)];
-      } else {
-        if (content) query.quote = new RegExp(content, 'i');
-        if (author) query.author = new RegExp(author, 'i');
-        if (year !== null) query.year = year;
-        quotes = await QuoteModel.find(query).limit(n);
-      }
-    } else {
-      // If no search options are provided, get random quotes
-      const count = await QuoteModel.countDocuments();
-      quotes = await QuoteModel.aggregate([
-        { $sample: { size: Math.min(n, count) } },
-      ]);
-    }
-
-    if (quotes && quotes.length > 0) {
-      const response = quotes.map(formatQuote).join('\n\n');
-      await interaction.reply(response);
-    } else {
-      await interaction.reply({
-        content: 'No quotes found matching your criteria.',
-        ephemeral: true,
-      });
+    if (subcommand === 'random') {
+      await handleRandomCommand(interaction, n);
+    } else if (subcommand === 'search') {
+      await handleSearchCommand(interaction, n);
     }
   },
 };
 
-export default command;
+async function handleSearchAutocomplete(
+  interaction: AutocompleteInteraction,
+  focusedOption: { name: string; value: string },
+) {
+  const author = interaction.options.getString('author')?.toLowerCase();
+  const year = interaction.options.getInteger('year');
+  const query: Record<string, unknown> = {};
+  if (author) query.author = new RegExp(author, 'i');
+  if (year) query.year = year;
+
+  let choices: { name: string; value: string | number }[] = [];
+
+  switch (focusedOption.name) {
+    case 'content':
+      choices = await getContentChoices(query, focusedOption.value);
+      break;
+    case 'author':
+      choices = await getAuthorChoices(query, focusedOption.value);
+      break;
+    case 'year':
+      choices = await getYearChoices(query, focusedOption.value);
+      break;
+  }
+
+  await interaction.respond(
+    choices.length > 0
+      ? choices
+      : [{ name: 'No matching entries found', value: 'not_found' }],
+  );
+}
+
+async function getContentChoices(
+  query: Record<string, unknown>,
+  value: string,
+): Promise<{ name: string; value: string }[]> {
+  if (!value) {
+    const recentQuotes = await QuoteModel.find(query)
+      .sort({ _id: -1 })
+      .limit(CONFIG.AUTOCOMPLETE_LIMIT)
+      .lean<IQuote[]>();
+    return recentQuotes.map((quote) => ({
+      name: quote.quote.substring(0, 100),
+      value: quote.quote,
+    }));
+  } else {
+    query.quote = new RegExp(value, 'i');
+    const matchingQuotes = await QuoteModel.find(query)
+      .limit(CONFIG.AUTOCOMPLETE_LIMIT)
+      .lean<IQuote[]>();
+    return matchingQuotes.map((quote) => ({
+      name: quote.quote.substring(0, 100),
+      value: quote.quote,
+    }));
+  }
+}
+
+async function getAuthorChoices(
+  query: Record<string, unknown>,
+  value: string,
+): Promise<{ name: string; value: string }[]> {
+  if (!value) {
+    const recentAuthors = await QuoteModel.aggregate<{ _id: string }>([
+      { $match: query },
+      { $group: { _id: '$author' } },
+      { $sort: { _id: 1 } },
+      { $limit: CONFIG.AUTOCOMPLETE_LIMIT },
+    ]);
+    return recentAuthors.map((author) => ({
+      name: author._id,
+      value: author._id,
+    }));
+  } else {
+    query.author = new RegExp(value, 'i');
+    const matchingAuthors = await QuoteModel.distinct('author', query);
+    return matchingAuthors
+      .slice(0, CONFIG.AUTOCOMPLETE_LIMIT)
+      .map((author) => ({
+        name: author,
+        value: author,
+      }));
+  }
+}
+
+async function getYearChoices(
+  query: Record<string, unknown>,
+  value: string,
+): Promise<{ name: string; value: number }[]> {
+  if (!value) {
+    const years = await QuoteModel.distinct('year', query);
+    return years
+      .filter((year): year is number => typeof year === 'number')
+      .sort((a, b) => b - a)
+      .slice(0, CONFIG.AUTOCOMPLETE_LIMIT)
+      .map((year) => ({
+        name: year.toString(),
+        value: year,
+      }));
+  } else {
+    const yearValue = parseInt(value);
+    if (!isNaN(yearValue)) {
+      query.year = { $lte: yearValue };
+      const matchingYears = await QuoteModel.distinct('year', query);
+      return matchingYears
+        .filter((year): year is number => typeof year === 'number')
+        .sort((a, b) => b - a)
+        .slice(0, CONFIG.AUTOCOMPLETE_LIMIT)
+        .map((year) => ({
+          name: year.toString(),
+          value: year,
+        }));
+    }
+    return [];
+  }
+}
+
+async function handleRandomAutocomplete(interaction: AutocompleteInteraction) {
+  const totalQuotes = await QuoteModel.countDocuments();
+  const choices: { name: string; value: number }[] = [];
+
+  for (let i = 1; i <= Math.min(CONFIG.AUTOCOMPLETE_LIMIT, totalQuotes); i++) {
+    const quote = await QuoteModel.findOne()
+      .skip(i - 1)
+      .lean<IQuote>();
+    if (quote) {
+      choices.push({
+        name: `#${i}: ${quote.quote.substring(0, 50)}...`,
+        value: i,
+      });
+    }
+  }
+
+  await interaction.respond(choices);
+}
+
+async function handleRandomCommand(
+  interaction: ChatInputCommandInteraction,
+  n: number,
+) {
+  const id = interaction.options.getInteger('id');
+  let quotes: IQuote[];
+
+  if (id) {
+    const quote = await QuoteModel.findOne()
+      .skip(id - 1)
+      .lean<IQuote>();
+    quotes = quote ? [quote] : [];
+  } else {
+    const totalQuotes = await QuoteModel.countDocuments();
+    const randomIndices = Array.from({ length: n }, () =>
+      Math.floor(Math.random() * totalQuotes),
+    );
+    const randomQuotes = await Promise.all(
+      randomIndices.map((index) =>
+        QuoteModel.findOne().skip(index).lean<IQuote>(),
+      ),
+    );
+    quotes = randomQuotes.filter((quote): quote is IQuote => quote !== null);
+  }
+
+  if (quotes.length > 0) {
+    const response = formatRandomQuotes(quotes);
+    await interaction.reply(response);
+  } else {
+    await interaction.reply({
+      content: 'No quotes found.',
+      ephemeral: true,
+    });
+  }
+}
+
+function formatRandomQuotes(quotes: IQuote[]): string {
+  return quotes
+    .map((quote) => {
+      const context = quote.context ? `, ${quote.context}` : '';
+      return `“${quote.quote}” — ${quote.author}${context}, ${quote.year}`;
+    })
+    .join('\n\n');
+}
+
+async function handleSearchCommand(
+  interaction: ChatInputCommandInteraction,
+  n: number,
+) {
+  const content = interaction.options.getString('content') ?? undefined;
+  const author = interaction.options.getString('author') ?? undefined;
+  const year = interaction.options.getInteger('year') ?? undefined;
+
+  if (!content && !author && !year) {
+    await interaction.reply({
+      content: 'Please provide at least one search parameter.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const searchResults = await searchQuotes(content, author, year, n);
+
+  if (searchResults.length > 0) {
+    const response = await formatSearchResults(searchResults);
+    await interaction.reply(response);
+  } else {
+    await interaction.reply({
+      content: 'No matching quotes found.',
+      ephemeral: true,
+    });
+  }
+}
+
+async function searchQuotes(
+  content?: string,
+  author?: string,
+  year?: number,
+  count: number = 1,
+): Promise<QuoteWithRelevance[]> {
+  const query: Record<string, unknown> = {};
+
+  if (content) query.quote = new RegExp(content, 'i');
+  if (author) query.author = new RegExp(author, 'i');
+  if (year) query.year = year;
+
+  const quotes = await QuoteModel.find(query).limit(count).lean<IQuote[]>();
+
+  return quotes.map(
+    (quote: IQuote) =>
+      ({
+        ...quote,
+        relevance: calculateRelevance(quote, content, author, year),
+      }) as QuoteWithRelevance,
+  );
+}
+
+function calculateRelevance(
+  quote: IQuote,
+  content?: string,
+  author?: string,
+  year?: number,
+): number {
+  let relevance = 0;
+
+  if (content) {
+    const quoteLower = quote.quote.toLowerCase();
+    const contentLower = content.toLowerCase();
+
+    if (quoteLower === contentLower) {
+      relevance += CONFIG.RELEVANCY_WEIGHTS.exactMatch;
+    } else if (quoteLower.includes(contentLower)) {
+      relevance += CONFIG.RELEVANCY_WEIGHTS.partialMatch;
+    } else if (
+      levenshteinDistance(quoteLower, contentLower) <=
+      CONFIG.LEVENSHTEIN_DISTANCE_THRESHOLD
+    ) {
+      relevance += CONFIG.RELEVANCY_WEIGHTS.fuzzyMatch;
+    }
+  }
+
+  if (author && quote.author.toLowerCase() === author.toLowerCase()) {
+    relevance += CONFIG.RELEVANCY_WEIGHTS.exactMatch;
+  }
+
+  if (year && quote.year === year) {
+    relevance += CONFIG.RELEVANCY_WEIGHTS.exactMatch;
+  }
+
+  return relevance;
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = Math.min(
+          dp[i - 1][j - 1] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j] + 1,
+        );
+      }
+    }
+  }
+
+  return dp[m][n];
+}
+
+async function formatSearchResults(
+  quotes: QuoteWithRelevance[],
+): Promise<string> {
+  return quotes
+    .map(
+      (quote) =>
+        `**${quote.author}**, ${quote.year}\n> ${quote.quote} (Relevance: ${quote.relevance})`,
+    )
+    .join('\n\n');
+}
+
+export default quoteCommands;
