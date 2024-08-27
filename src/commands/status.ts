@@ -1,4 +1,5 @@
 import {
+  ActivityType,
   ChatInputCommandInteraction,
   PermissionFlagsBits,
   SlashCommandBuilder,
@@ -45,7 +46,9 @@ const command: SlashCommand = {
         { upsert: true },
       );
 
-      await interaction.client.user?.setActivity(newStatus);
+      interaction.client.user.setActivity(newStatus, {
+        type: ActivityType.Custom,
+      });
       await interaction.reply(`Bot status updated to: ${newStatus}`);
     } catch (error) {
       console.error('Error updating status:', error);
