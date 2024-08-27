@@ -1,6 +1,7 @@
 import {
   AutocompleteInteraction,
   CommandInteraction,
+  PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
 import { Types } from 'mongoose';
@@ -31,7 +32,7 @@ const command: SlashCommand = {
         .setName('year')
         .setDescription('The year when this quote was born.')
         .setMinValue(0)
-        .setMaxValue(new Date().getFullYear() + 1)
+        .setMaxValue(2100)
         .setRequired(true),
     )
     .addStringOption((option) =>
@@ -48,7 +49,9 @@ const command: SlashCommand = {
     .addStringOption((option) =>
       option
         .setName('override')
-        .setDescription('id of the quote to override. (Use with caution!)')
+        .setDescription(
+          'id of the quote to override. (Admin only - use with caution!)',
+        )
         .setAutocomplete(true),
     ) as SlashCommandBuilder,
   cooldown: 5,
@@ -79,6 +82,16 @@ const command: SlashCommand = {
 
     try {
       if (overrideId) {
+        // Check if the user has administrator permissions
+        if (
+          !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)
+        ) {
+          await interaction.editReply(
+            'Error: You need administrator permissions to override quotes.',
+          );
+          return;
+        }
+
         // Check if the quote to override exists
         const existingQuote = await QuoteModel.findById(overrideId);
         if (!existingQuote) {
