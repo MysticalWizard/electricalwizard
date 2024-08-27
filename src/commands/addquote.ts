@@ -42,7 +42,13 @@ const command: SlashCommand = {
     .addStringOption((option) =>
       option
         .setName('link')
-        .setDescription('Allows chaining this quote to another quote.')
+        .setDescription('id of the quote to link to. (optional)')
+        .setAutocomplete(true),
+    )
+    .addStringOption((option) =>
+      option
+        .setName('override')
+        .setDescription('id of the quote to override. (Use with caution!)')
         .setAutocomplete(true),
     ) as SlashCommandBuilder,
   cooldown: 5,
@@ -51,49 +57,12 @@ const command: SlashCommand = {
     const focusedOption = interaction.options.getFocused(true);
 
     if (focusedOption.name === 'author') {
-      // Existing author autocomplete logic
-      const focusedValue = focusedOption.value;
-
-      // Fetch the 5 most popular authors
-      const popularAuthors = await QuoteModel.aggregate([
-        { $group: { _id: '$author', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 5 },
-        { $project: { _id: 0, author: '$_id' } },
-      ]);
-
-      // Fetch the most recent author
-      const recentAuthor = await QuoteModel.findOne()
-        .sort({ _id: -1 })
-        .select('author');
-
-      // Combine popular authors and recent author, removing duplicates
-      const choices = [
-        ...new Set([
-          ...popularAuthors.map((a) => a.author),
-          recentAuthor ? recentAuthor.author : '',
-        ]),
-      ].filter(Boolean);
-
-      const filtered = choices.filter((choice) =>
-        choice.toLowerCase().startsWith(focusedValue.toLowerCase()),
-      );
-      await interaction.respond(
-        filtered.map((choice) => ({ name: choice, value: choice })),
-      );
-    } else if (focusedOption.name === 'link') {
-      // Fetch the 5 most recent quotes
-      const recentQuotes = await QuoteModel.find()
-        .sort({ _id: -1 })
-        .limit(5)
-        .lean();
-
-      const choices = recentQuotes.map((quote) => ({
-        name: `${quote.quote.substring(0, 50)}...`,
-        value: quote._id.toString(),
-      }));
-
-      await interaction.respond(choices);
+      await handleAuthorAutocomplete(interaction, focusedOption.value);
+    } else if (
+      focusedOption.name === 'link' ||
+      focusedOption.name === 'override'
+    ) {
+      await handleQuoteAutocomplete(interaction, 5);
     }
   },
 
@@ -106,68 +75,148 @@ const command: SlashCommand = {
     const year = interaction.options.getInteger('year', true);
     const context = interaction.options.getString('context');
     const linkId = interaction.options.getString('link');
+    const overrideId = interaction.options.getString('override');
 
     try {
-      if (linkId) {
-        // Check for double links
-        const existingLink = await QuoteModel.findOne({ link: linkId });
-        if (existingLink) {
-          await interaction.editReply(
-            'Error: Double link. This quote is already linked to another quote.',
-          );
+      if (overrideId) {
+        // Check if the quote to override exists
+        const existingQuote = await QuoteModel.findById(overrideId);
+        if (!existingQuote) {
+          await interaction.editReply('Error: Quote to override not found.');
           return;
         }
 
-        // Check for circular links and maximum chain length
-        const chainLength = await checkCircularAndChainLength(linkId);
-        if (chainLength === -1) {
-          await interaction.editReply('Error: Circular link detected.');
-          return;
+        // Update the existing quote
+        existingQuote.quote = quoteContent;
+        existingQuote.author = author;
+        existingQuote.year = year;
+        if (context) {
+          existingQuote.context = context;
         }
-        if (chainLength >= 5) {
-          await interaction.editReply(
-            'Error: Maximum chain length (5) reached.',
-          );
-          return;
+        if (linkId) {
+          existingQuote.link = new Types.ObjectId(linkId);
         }
+
+        await existingQuote.save();
+
+        const formattedQuote = `"${quoteContent}" — ${author}${context ? `, ${context}` : ''}, ${year}`;
+        await interaction.editReply(
+          `Quote #${overrideId} updated!\nFormatted quote: ${formattedQuote}`,
+        );
+      } else {
+        // Existing code for adding a new quote
+        if (linkId) {
+          // Check for double links
+          const existingLink = await QuoteModel.findOne({ link: linkId });
+          if (existingLink) {
+            await interaction.editReply(
+              'Error: Double link. This quote is already linked to another quote.',
+            );
+            return;
+          }
+
+          // Check for circular links and maximum chain length
+          const chainLength = await checkCircularAndChainLength(linkId);
+          if (chainLength === -1) {
+            await interaction.editReply('Error: Circular link detected.');
+            return;
+          }
+          if (chainLength >= 5) {
+            await interaction.editReply(
+              'Error: Maximum chain length (5) reached.',
+            );
+            return;
+          }
+        }
+
+        const newQuote = new QuoteModel({
+          quote: quoteContent,
+          author,
+          year,
+          context,
+          link: linkId ? new Types.ObjectId(linkId) : undefined,
+        });
+
+        await newQuote.save();
+
+        const quoteCount = await QuoteModel.countDocuments();
+        const formattedQuote = `"${quoteContent}" — ${author}${context ? `, ${context}` : ''}, ${year}`;
+
+        let replyContent = `Quote #${quoteCount} added!\nFormatted quote: ${formattedQuote}`;
+
+        if (linkId) {
+          const linkedQuote = await QuoteModel.findById(linkId);
+          if (linkedQuote) {
+            const truncatedQuote =
+              linkedQuote.quote.length > 50
+                ? `${linkedQuote.quote.substring(0, 50)}...`
+                : linkedQuote.quote;
+            replyContent += `\nLinked to: "${truncatedQuote}" (#${linkedQuote._id})`;
+          }
+        }
+
+        await interaction.editReply(replyContent);
       }
-
-      const newQuote = new QuoteModel({
-        quote: quoteContent,
-        author,
-        year,
-        context,
-        link: linkId ? new Types.ObjectId(linkId) : undefined,
-      });
-
-      await newQuote.save();
-
-      const quoteCount = await QuoteModel.countDocuments();
-      const formattedQuote = `"${quoteContent}" — ${author}${context ? `, ${context}` : ''}, ${year}`;
-
-      let replyContent = `Quote #${quoteCount} added!\nFormatted quote: ${formattedQuote}`;
-
-      if (linkId) {
-        const linkedQuote = await QuoteModel.findById(linkId);
-        if (linkedQuote) {
-          const truncatedQuote =
-            linkedQuote.quote.length > 50
-              ? `${linkedQuote.quote.substring(0, 50)}...`
-              : linkedQuote.quote;
-          replyContent += `\nLinked to: "${truncatedQuote}" (#${linkedQuote._id})`;
-        }
-      }
-
-      await interaction.editReply(replyContent);
     } catch (error) {
-      console.error('Error adding quote:', error);
+      console.error('Error adding or updating quote:', error);
       await interaction.editReply({
         content:
-          'There was an error while adding the quote. Please try again later.',
+          'There was an error while adding or updating the quote. Please try again later.',
       });
     }
   },
 };
+
+async function handleAuthorAutocomplete(
+  interaction: AutocompleteInteraction,
+  focusedValue: string,
+) {
+  // Fetch the 5 most popular authors
+  const popularAuthors = await QuoteModel.aggregate([
+    { $group: { _id: '$author', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: 5 },
+    { $project: { _id: 0, author: '$_id' } },
+  ]);
+
+  // Fetch the most recent author
+  const recentAuthor = await QuoteModel.findOne()
+    .sort({ _id: -1 })
+    .select('author');
+
+  // Combine popular authors and recent author, removing duplicates
+  const choices = [
+    ...new Set([
+      ...popularAuthors.map((a) => a.author),
+      recentAuthor ? recentAuthor.author : '',
+    ]),
+  ].filter(Boolean);
+
+  const filtered = choices.filter((choice) =>
+    choice.toLowerCase().startsWith(focusedValue.toLowerCase()),
+  );
+  await interaction.respond(
+    filtered.map((choice) => ({ name: choice, value: choice })),
+  );
+}
+
+async function handleQuoteAutocomplete(
+  interaction: AutocompleteInteraction,
+  count: number,
+) {
+  // Fetch the 5 most recent quotes
+  const recentQuotes = await QuoteModel.find()
+    .sort({ _id: -1 })
+    .limit(count)
+    .lean();
+
+  const choices = recentQuotes.map((quote) => ({
+    name: `${quote.quote.substring(0, 50)}...`,
+    value: quote._id.toString(),
+  }));
+
+  await interaction.respond(choices);
+}
 
 async function checkCircularAndChainLength(
   quoteId: string,
