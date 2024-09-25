@@ -4,6 +4,12 @@ import UserModel from '@/models/User.js';
 export const validFileExtension =
   config.bot.env === 'production' ? '.js' : '.ts';
 
+export function getOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
 export async function formatAuthorName(
   userId: string,
   username: string,

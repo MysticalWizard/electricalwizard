@@ -36,7 +36,7 @@ const event: Event<Events.ClientReady> = {
     // Start the birthday check service
     try {
       const birthdayService = createBirthdayService(client);
-      birthdayService.startBirthdayCheck(60);
+      birthdayService.startBirthdayCheck();
     } catch (error) {
       console.error('Error starting birthday check service:', error);
     }

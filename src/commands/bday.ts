@@ -52,8 +52,7 @@ const command: SlashCommand = {
     .addBooleanOption((option) =>
       option
         .setName('announce')
-        .setDescription('Announce your birthday in chat?')
-        .setRequired(true),
+        .setDescription('Announce your birthday in chat?'),
     ) as SlashCommandBuilder,
   global: true,
   cooldown: 10, // in seconds
@@ -65,7 +64,7 @@ const command: SlashCommand = {
     const timezoneOffset = parseInt(
       interaction.options.getString('timezone', true),
     );
-    const announce = interaction.options.getBoolean('announce', true);
+    const announce = interaction.options.getBoolean('announce') || true;
 
     // Parse month and day, removing leading zeros
     const month = parseInt(monthInput, 10);
