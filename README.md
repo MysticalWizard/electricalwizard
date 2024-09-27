@@ -102,4 +102,4 @@ If problems persist, check the console output for error messages and refer to th
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
