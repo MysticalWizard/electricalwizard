@@ -16,6 +16,11 @@ const QuoteSchema = new Schema({
   link: { type: Types.ObjectId, ref: 'Quote' },
 });
 
+// Add indexes for better query performance
+QuoteSchema.index({ quote: 'text' }); // Text index for content searching
+QuoteSchema.index({ author: 1 }); // Index for author filtering
+QuoteSchema.index({ year: 1 }); // Index for year filtering
+
 const QuoteModel = model<IQuote>('Quote', QuoteSchema);
 
 export default QuoteModel;

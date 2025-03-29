@@ -5,10 +5,11 @@ import {
 } from 'discord.js';
 import QuoteModel, { IQuote } from '@/models/Quote.js';
 import { SlashCommand } from '@/types';
+import type { PipelineStage } from 'mongoose';
 
 // Configuration
 const CONFIG = {
-  MAX_SEARCH_RESULTS: 5,
+  MAX_SEARCH_RESULTS: 10,
   LEVENSHTEIN_DISTANCE_THRESHOLD: 2,
   AUTOCOMPLETE_LIMIT: 25,
   RELEVANCY_WEIGHTS: {
@@ -37,10 +38,16 @@ const command: SlashCommand = {
             .setMinValue(1)
             .setAutocomplete(true),
         )
+        .addStringOption((option) =>
+          option
+            .setName('author')
+            .setDescription('Retrieve quotes from this author')
+            .setAutocomplete(true),
+        )
         .addIntegerOption((option) =>
           option
             .setName('count')
-            .setDescription('Number of random quotes to retrieve (1-5)')
+            .setDescription('Number of random quotes to retrieve (1-10)')
             .setMinValue(1)
             .setMaxValue(CONFIG.MAX_SEARCH_RESULTS),
         ),
@@ -70,7 +77,7 @@ const command: SlashCommand = {
         .addIntegerOption((option) =>
           option
             .setName('count')
-            .setDescription('Number of quotes to retrieve (1-5)')
+            .setDescription('Number of quotes to retrieve (1-10)')
             .setMinValue(1)
             .setMaxValue(CONFIG.MAX_SEARCH_RESULTS),
         ),
@@ -80,8 +87,13 @@ const command: SlashCommand = {
     const subcommand = interaction.options.getSubcommand();
     const focusedOption = interaction.options.getFocused(true);
 
-    if (subcommand === 'random' && focusedOption.name === 'id') {
-      await handleRandomAutocomplete(interaction);
+    if (subcommand === 'random') {
+      if (focusedOption.name === 'id') {
+        await handleRandomAutocomplete(interaction);
+      } else if (focusedOption.name === 'author') {
+        // Handle author autocomplete for random command
+        await handleAuthorAutocomplete(interaction, focusedOption.value);
+      }
     } else if (subcommand === 'search') {
       await handleSearchAutocomplete(interaction, focusedOption);
     }
@@ -137,6 +149,24 @@ async function handleSearchAutocomplete(
   );
 }
 
+/**
+ * Handles autocomplete for author selections
+ * @param interaction - The autocomplete interaction
+ * @param value - The value being entered by the user
+ */
+async function handleAuthorAutocomplete(
+  interaction: AutocompleteInteraction,
+  value: string,
+): Promise<void> {
+  const choices = await getAuthorChoices({}, value);
+
+  await interaction.respond(
+    choices.length > 0
+      ? choices
+      : [{ name: 'No matching authors found', value: 'not_found' }],
+  );
+}
+
 async function getContentChoices(
   query: Record<string, unknown>,
   value: string,
@@ -167,20 +197,23 @@ async function getAuthorChoices(
   value: string,
 ): Promise<{ name: string; value: string }[]> {
   if (!value) {
-    const recentAuthors = await QuoteModel.aggregate<{ _id: string }>([
+    // Get distinct authors, sorted alphabetically
+    const authors = await QuoteModel.aggregate<{ _id: string }>([
       { $match: query },
       { $group: { _id: '$author' } },
       { $sort: { _id: 1 } },
       { $limit: CONFIG.AUTOCOMPLETE_LIMIT },
     ]);
-    return recentAuthors.map((author) => ({
+    return authors.map((author) => ({
       name: author._id,
       value: author._id,
     }));
   } else {
+    // Find authors matching the value
     query.author = new RegExp(value, 'i');
     const matchingAuthors = await QuoteModel.distinct('author', query);
     return matchingAuthors
+      .sort()
       .slice(0, CONFIG.AUTOCOMPLETE_LIMIT)
       .map((author) => ({
         name: author,
@@ -228,56 +261,84 @@ async function getYearChoices(
 async function handleRandomAutocomplete(
   interaction: AutocompleteInteraction,
 ): Promise<void> {
-  const totalQuotes = await QuoteModel.countDocuments();
-  const choices: { name: string; value: number }[] = [];
+  try {
+    // Get the total count of quotes
+    const totalQuotes = await QuoteModel.countDocuments();
 
-  for (let i = 1; i <= Math.min(CONFIG.AUTOCOMPLETE_LIMIT, totalQuotes); i++) {
-    const quote = await QuoteModel.findOne()
-      .skip(i - 1)
-      .lean<IQuote>();
-    if (quote) {
-      choices.push({
-        name: `#${i}: ${quote.quote.substring(0, 50)}...`,
-        value: i,
-      });
-    }
+    // Fetch multiple quotes in a single query with proper sorting
+    const quotes = await QuoteModel.aggregate([
+      { $sort: { _id: 1 } },
+      { $limit: Math.min(CONFIG.AUTOCOMPLETE_LIMIT, totalQuotes) },
+    ]);
+
+    const choices = quotes.map((quote, index) => ({
+      name: `#${index + 1}: "${quote.quote.substring(0, 50)}${quote.quote.length > 50 ? '...' : ''}"`,
+      value: index + 1,
+    }));
+
+    await interaction.respond(choices);
+  } catch (error) {
+    console.error('Error in random autocomplete:', error);
+    await interaction.respond([{ name: 'Error retrieving quotes', value: 0 }]);
   }
-
-  await interaction.respond(choices);
 }
 
 async function handleRandomCommand(
   interaction: ChatInputCommandInteraction,
   n: number,
 ) {
+  await interaction.deferReply();
+
   const id = interaction.options.getInteger('id');
+  const author = interaction.options.getString('author');
   let quotes: IQuote[];
 
-  if (id) {
-    const quote = await QuoteModel.findOne()
-      .skip(id - 1)
-      .lean<IQuote>();
-    quotes = quote ? [quote] : [];
-  } else {
-    const totalQuotes = await QuoteModel.countDocuments();
-    const randomIndices = Array.from({ length: n }, () =>
-      Math.floor(Math.random() * totalQuotes),
-    );
-    const randomQuotes = await Promise.all(
-      randomIndices.map((index) =>
-        QuoteModel.findOne().skip(index).lean<IQuote>(),
-      ),
-    );
-    quotes = randomQuotes.filter((quote): quote is IQuote => quote !== null);
-  }
+  try {
+    if (id) {
+      // When ID is specified, we should use aggregation with $skip instead of findOne().skip()
+      // This is more reliable when dealing with database changes
+      const quote = await QuoteModel.aggregate([
+        { $sort: { _id: 1 } },
+        { $skip: id - 1 },
+        { $limit: 1 },
+      ]);
+      quotes = quote.length > 0 ? quote : [];
+    } else {
+      // Use aggregation for efficient random selection
+      const aggregation: PipelineStage[] = [];
 
-  if (quotes.length > 0) {
-    const response = formatRandomQuotes(quotes);
-    await interaction.reply(response);
-  } else {
-    await interaction.reply({
-      content: 'No quotes found.',
-      ephemeral: true,
+      // Add match stage if author is specified
+      if (author) {
+        aggregation.push({
+          $match: { author: new RegExp(`^${author}$`, 'i') },
+        } as PipelineStage);
+      }
+
+      // Add sample stage for random selection
+      aggregation.push({
+        $sample: { size: n },
+      } as PipelineStage);
+
+      quotes = await QuoteModel.aggregate(aggregation);
+    }
+
+    if (quotes.length > 0) {
+      const response = formatRandomQuotes(quotes);
+      await interaction.editReply(response);
+    } else {
+      const noQuotesMessage = author
+        ? `No quotes found for author "${author}".`
+        : 'No quotes found.';
+
+      await interaction.editReply({
+        content: noQuotesMessage,
+      });
+    }
+  } catch (error) {
+    console.error('Error retrieving random quotes:', error);
+    await interaction.editReply({
+      content:
+        'An error occurred while retrieving quotes. Please try again later.',
     });
   }
 }
@@ -286,7 +347,8 @@ function formatRandomQuotes(quotes: IQuote[]): string {
   return quotes
     .map((quote) => {
       const context = quote.context ? `, ${quote.context}` : '';
-      return `“${quote.quote}” — ${quote.author}${context}, ${quote.year}`;
+      // Preserve any newlines in the original quote
+      return `"${quote.quote}" — ${quote.author}${context}, ${quote.year}`;
     })
     .join('\n\n');
 }
@@ -295,27 +357,43 @@ async function handleSearchCommand(
   interaction: ChatInputCommandInteraction,
   n: number,
 ) {
+  await interaction.deferReply();
+
   const content = interaction.options.getString('content') ?? undefined;
   const author = interaction.options.getString('author') ?? undefined;
   const year = interaction.options.getInteger('year') ?? undefined;
 
-  if (!content && !author && !year) {
-    await interaction.reply({
-      content: 'Please provide at least one search parameter.',
-      ephemeral: true,
+  // Handle the case where autocomplete returned not_found
+  if (content === 'not_found' || author === 'not_found') {
+    await interaction.editReply({
+      content: 'Please provide valid search parameters.',
     });
     return;
   }
 
-  const searchResults = await searchQuotes(content, author, year, n);
+  if (!content && !author && !year) {
+    await interaction.editReply({
+      content: 'Please provide at least one search parameter.',
+    });
+    return;
+  }
 
-  if (searchResults.length > 0) {
-    const response = await formatSearchResults(searchResults);
-    await interaction.reply(response);
-  } else {
-    await interaction.reply({
-      content: 'No matching quotes found.',
-      ephemeral: true,
+  try {
+    const searchResults = await searchQuotes(content, author, year, n);
+
+    if (searchResults.length > 0) {
+      const response = formatSearchResults(searchResults);
+      await interaction.editReply(response);
+    } else {
+      await interaction.editReply({
+        content: 'No matching quotes found.',
+      });
+    }
+  } catch (error) {
+    console.error('Error searching quotes:', error);
+    await interaction.editReply({
+      content:
+        'An error occurred while searching quotes. Please try again later.',
     });
   }
 }
@@ -326,21 +404,45 @@ async function searchQuotes(
   year?: number,
   count: number = 1,
 ): Promise<QuoteWithRelevance[]> {
-  const query: Record<string, unknown> = {};
+  // Build the aggregation pipeline
+  const pipeline: PipelineStage[] = [];
 
-  if (content) query.quote = new RegExp(content, 'i');
-  if (author) query.author = new RegExp(author, 'i');
-  if (year) query.year = year;
+  // Match stage for filtering
+  const matchStage: Record<string, unknown> = {};
 
-  const quotes = await QuoteModel.find(query).limit(count).lean<IQuote[]>();
+  // Safely create regex patterns
+  try {
+    if (content) matchStage.quote = new RegExp(content, 'i');
+    if (author) matchStage.author = new RegExp(author, 'i');
+  } catch (error) {
+    console.error('Invalid regex pattern:', error);
+    // Default to something that can be searched safely
+    if (content) matchStage.quote = content;
+    if (author) matchStage.author = author;
+  }
 
-  return quotes.map(
-    (quote: IQuote) =>
-      ({
-        ...quote,
-        relevance: calculateRelevance(quote, content, author, year),
-      }) as QuoteWithRelevance,
-  );
+  if (year) matchStage.year = year;
+
+  if (Object.keys(matchStage).length > 0) {
+    pipeline.push({ $match: matchStage } as PipelineStage);
+  }
+
+  // Add limit
+  pipeline.push({ $limit: count } as PipelineStage);
+
+  // Execute the pipeline
+  const quotes = await QuoteModel.aggregate(pipeline);
+
+  // Calculate relevance scores for sorting
+  return quotes
+    .map(
+      (quote: IQuote) =>
+        ({
+          ...quote,
+          relevance: calculateRelevance(quote, content, author, year),
+        }) as QuoteWithRelevance,
+    )
+    .sort((a, b) => b.relevance - a.relevance);
 }
 
 function calculateRelevance(
@@ -403,14 +505,15 @@ function levenshteinDistance(a: string, b: string): number {
   return dp[m][n];
 }
 
-async function formatSearchResults(
-  quotes: QuoteWithRelevance[],
-): Promise<string> {
+function formatSearchResults(quotes: QuoteWithRelevance[]): string {
   return quotes
-    .map(
-      (quote) =>
-        `**${quote.author}**, ${quote.year}\n> ${quote.quote} (Relevance: ${quote.relevance})`,
-    )
+    .map((quote) => {
+      // For multi-line quotes, handle each line with a quote marker
+      const quoteLines = quote.quote.split('\n');
+      const formattedQuote = quoteLines.map((line) => `> "${line}"`).join('\n');
+
+      return `**${quote.author}**, ${quote.year}\n${formattedQuote}`;
+    })
     .join('\n\n');
 }
 

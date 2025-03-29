@@ -2,10 +2,10 @@ import { Client, TextChannel } from 'discord.js';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
-import config from '@/config';
+import config from '@/config.js';
 import GuildModel from '@/models/Guild.js';
 import UserModel, { IUser } from '@/models/User.js';
-import { getOrdinal } from '@/utils/helpers';
+import { getOrdinal } from '@/utils/helpers.js';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
