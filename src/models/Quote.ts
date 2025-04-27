@@ -1,6 +1,7 @@
 import { Document, Schema, Types, model } from 'mongoose';
 
 export interface IQuote extends Document {
+  _id: Types.ObjectId; // Explicitly define the _id type
   quote: string;
   author: string;
   context: string;
