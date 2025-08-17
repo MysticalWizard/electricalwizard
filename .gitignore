@@ -9,6 +9,9 @@
 /dist
 /out
 
+# AI notes
+CLAUDE.md
+
 # local env files
 .env
 .env.*

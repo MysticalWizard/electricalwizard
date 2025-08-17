@@ -12,6 +12,7 @@ dayjs.extend(timezone);
 
 export class BirthdayService {
   private client: Client;
+  private checkInterval: NodeJS.Timeout | null = null;
 
   constructor(client: Client) {
     this.client = client;
@@ -19,6 +20,12 @@ export class BirthdayService {
 
   public async startBirthdayCheck(): Promise<void> {
     console.log(`Starting birthday check service (interval: 1 hr)`);
+    
+    // Stop any existing interval
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+    }
+    
     // Calculate time until the next hour
     const now = dayjs();
     const nextHour = now.startOf('hour').add(1, 'hour');
@@ -27,12 +34,21 @@ export class BirthdayService {
     // Schedule the first check at the next hour
     setTimeout(() => {
       this.runBirthdayCheck();
-      setInterval(() => this.runBirthdayCheck(), 60 * 60 * 1000);
+      // Use setInterval for consistent timing
+      this.checkInterval = setInterval(() => this.runBirthdayCheck(), 60 * 60 * 1000);
     }, msUntilNextHour);
 
     console.log(
       `Next birthday check scheduled for ${nextHour.format('YYYY-MM-DD HH:mm:ss')}`,
     );
+  }
+
+  public stopBirthdayCheck(): void {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+      console.log('Birthday check service stopped');
+    }
   }
 
   private async runBirthdayCheck(): Promise<void> {
@@ -48,28 +64,69 @@ export class BirthdayService {
 
   private async checkBirthdays(): Promise<void> {
     console.log('Checking for birthdays...');
-    const users = await UserModel.find({ birthday: { $exists: true } });
-    const now = dayjs();
+    
+    try {
+      const users = await UserModel.find({ birthday: { $exists: true } });
+      const now = dayjs.utc();
 
-    for (const user of users) {
-      const userBirthday = dayjs(user.birthday);
-      const userTimezone = user.birthdayTimezone || 0; // Default to UTC if not set
-      const current = now.tz(userTimezone.toString());
+      for (const user of users) {
+        try {
+          await this.checkUserBirthday(user, now);
+        } catch (error) {
+          console.error(`Error checking birthday for user ${user.userId}:`, error);
+          // Continue with other users even if one fails
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching users for birthday check:', error);
+    }
+  }
 
-      if (
-        userBirthday.month() === current.month() &&
-        userBirthday.date() === current.date() &&
-        current.hour() === 0 // Only announce between 0:00 and 0:59 or 0 to 59 minute of specified timezone
-      ) {
-        await this.sendBirthdayMessages(user);
+  private async checkUserBirthday(user: IUser, now: dayjs.Dayjs): Promise<void> {
+    const userBirthday = dayjs(user.birthday);
+    const userTimezone = user.birthdayTimezone || 0; // Default to UTC if not set
+    
+    // Calculate current time in user's timezone using UTC offset
+    const userCurrentTime = now.utcOffset(userTimezone * 60);
+    
+    // Check if it's the user's birthday today in their timezone
+    const isBirthdayToday = (
+      userBirthday.month() === userCurrentTime.month() &&
+      userBirthday.date() === userCurrentTime.date()
+    );
+    
+    // Only send if it's between 0:00 and 0:59 in their timezone
+    const isCorrectHour = userCurrentTime.hour() === 0;
+    
+    if (isBirthdayToday && isCorrectHour) {
+      // Check if we already sent notification today
+      const today = userCurrentTime.format('YYYY-MM-DD');
+      const lastNotification = user.lastBirthdayNotification 
+        ? dayjs(user.lastBirthdayNotification).format('YYYY-MM-DD')
+        : null;
+        
+      if (lastNotification !== today) {
+        await this.sendBirthdayMessages(user, userCurrentTime);
+        
+        // Update last notification date
+        user.lastBirthdayNotification = userCurrentTime.toDate();
+        await user.save();
       }
     }
   }
 
-  private async sendBirthdayMessages(user: IUser): Promise<void> {
-    const now = dayjs();
+  private async sendBirthdayMessages(user: IUser, userCurrentTime: dayjs.Dayjs): Promise<void> {
     const birthDate = dayjs(user.birthday);
-    const age = now.year() - birthDate.year();
+    
+    // Calculate age correctly - account for whether birthday has passed this year
+    let age = userCurrentTime.year() - birthDate.year();
+    const birthdayThisYear = birthDate.year(userCurrentTime.year());
+    
+    // If birthday hasn't occurred yet this year, subtract 1 from age
+    if (userCurrentTime.isBefore(birthdayThisYear)) {
+      age -= 1;
+    }
+    
     const ordinal = getOrdinal(age);
 
     // Send DM

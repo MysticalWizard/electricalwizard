@@ -145,33 +145,58 @@ const command: SlashCommand = {
   },
 };
 
-// Helper function to get all quotes in a chain
-async function getQuoteChain(
-  quote: IQuote,
-  visited: Set<string> = new Set(),
-): Promise<IQuote[]> {
-  const chain = [quote];
-  visited.add(quote._id.toString());
-
-  // Find quotes that link to this quote
-  const linkedToThisQuote = await QuoteModel.find({ link: quote._id });
-  for (const linkedQuote of linkedToThisQuote) {
-    if (!visited.has(linkedQuote._id.toString())) {
-      const subChain = await getQuoteChain(linkedQuote, visited);
-      chain.push(...subChain);
+// Helper function to get all quotes in a chain using aggregation
+async function getQuoteChain(quote: IQuote): Promise<IQuote[]> {
+  const result = await QuoteModel.aggregate([
+    { $match: { _id: quote._id } },
+    {
+      $graphLookup: {
+        from: 'quotes',
+        startWith: '$_id',
+        connectFromField: 'link',
+        connectToField: '_id',
+        as: 'linkedQuotes',
+        maxDepth: 10,
+        depthField: 'depth'
+      }
+    },
+    {
+      $graphLookup: {
+        from: 'quotes', 
+        startWith: '$_id',
+        connectFromField: '_id',
+        connectToField: 'link',
+        as: 'linkingQuotes',
+        maxDepth: 10,
+        depthField: 'depth'
+      }
+    },
+    {
+      $project: {
+        allQuotes: {
+          $concatArrays: [
+            [{ _id: '$_id', quote: '$quote', author: '$author', year: '$year', context: '$context', link: '$link' }],
+            '$linkedQuotes',
+            '$linkingQuotes'
+          ]
+        }
+      }
+    },
+    { $unwind: '$allQuotes' },
+    { $replaceRoot: { newRoot: '$allQuotes' } },
+    {
+      $group: {
+        _id: '$_id',
+        quote: { $first: '$quote' },
+        author: { $first: '$author' },
+        year: { $first: '$year' },
+        context: { $first: '$context' },
+        link: { $first: '$link' }
+      }
     }
-  }
+  ]);
 
-  // Follow the link if this quote has one
-  if (quote.link && !visited.has(quote.link.toString())) {
-    const linkedQuote = await QuoteModel.findById(quote.link);
-    if (linkedQuote) {
-      const subChain = await getQuoteChain(linkedQuote, visited);
-      chain.push(...subChain);
-    }
-  }
-
-  return chain;
+  return result;
 }
 
 export default command;

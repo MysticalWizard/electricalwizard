@@ -233,20 +233,37 @@ async function handleQuoteAutocomplete(
 
 async function checkCircularAndChainLength(
   quoteId: string,
-  visited: Set<string> = new Set(),
 ): Promise<number> {
-  if (visited.has(quoteId)) {
-    return -1; // Circular link detected
-  }
+  const result = await QuoteModel.aggregate([
+    { $match: { _id: new Types.ObjectId(quoteId) } },
+    {
+      $graphLookup: {
+        from: 'quotes',
+        startWith: '$link',
+        connectFromField: 'link',
+        connectToField: '_id',
+        as: 'chain',
+        maxDepth: 10,
+        depthField: 'depth'
+      }
+    },
+    {
+      $project: {
+        chainLength: { $add: [{ $size: '$chain' }, 1] },
+        hasCircular: {
+          $gt: [
+            { $size: { $setIntersection: [['$_id'], '$chain._id'] } },
+            0
+          ]
+        }
+      }
+    }
+  ]);
 
-  visited.add(quoteId);
-  const quote = await QuoteModel.findById(quoteId);
-
-  if (!quote || !quote.link) {
-    return visited.size;
-  }
-
-  return checkCircularAndChainLength(quote.link.toString(), visited);
+  if (result.length === 0) return 1;
+  
+  const { chainLength, hasCircular } = result[0];
+  return hasCircular ? -1 : chainLength;
 }
 
 export default command;
