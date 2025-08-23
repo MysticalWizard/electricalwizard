@@ -231,9 +231,7 @@ async function handleQuoteAutocomplete(
   await interaction.respond(choices);
 }
 
-async function checkCircularAndChainLength(
-  quoteId: string,
-): Promise<number> {
+async function checkCircularAndChainLength(quoteId: string): Promise<number> {
   const result = await QuoteModel.aggregate([
     { $match: { _id: new Types.ObjectId(quoteId) } },
     {
@@ -244,24 +242,21 @@ async function checkCircularAndChainLength(
         connectToField: '_id',
         as: 'chain',
         maxDepth: 10,
-        depthField: 'depth'
-      }
+        depthField: 'depth',
+      },
     },
     {
       $project: {
         chainLength: { $add: [{ $size: '$chain' }, 1] },
         hasCircular: {
-          $gt: [
-            { $size: { $setIntersection: [['$_id'], '$chain._id'] } },
-            0
-          ]
-        }
-      }
-    }
+          $gt: [{ $size: { $setIntersection: [['$_id'], '$chain._id'] } }, 0],
+        },
+      },
+    },
   ]);
 
   if (result.length === 0) return 1;
-  
+
   const { chainLength, hasCircular } = result[0];
   return hasCircular ? -1 : chainLength;
 }

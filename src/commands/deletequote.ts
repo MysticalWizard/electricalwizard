@@ -157,30 +157,39 @@ async function getQuoteChain(quote: IQuote): Promise<IQuote[]> {
         connectToField: '_id',
         as: 'linkedQuotes',
         maxDepth: 10,
-        depthField: 'depth'
-      }
+        depthField: 'depth',
+      },
     },
     {
       $graphLookup: {
-        from: 'quotes', 
+        from: 'quotes',
         startWith: '$_id',
         connectFromField: '_id',
         connectToField: 'link',
         as: 'linkingQuotes',
         maxDepth: 10,
-        depthField: 'depth'
-      }
+        depthField: 'depth',
+      },
     },
     {
       $project: {
         allQuotes: {
           $concatArrays: [
-            [{ _id: '$_id', quote: '$quote', author: '$author', year: '$year', context: '$context', link: '$link' }],
+            [
+              {
+                _id: '$_id',
+                quote: '$quote',
+                author: '$author',
+                year: '$year',
+                context: '$context',
+                link: '$link',
+              },
+            ],
             '$linkedQuotes',
-            '$linkingQuotes'
-          ]
-        }
-      }
+            '$linkingQuotes',
+          ],
+        },
+      },
     },
     { $unwind: '$allQuotes' },
     { $replaceRoot: { newRoot: '$allQuotes' } },
@@ -191,9 +200,9 @@ async function getQuoteChain(quote: IQuote): Promise<IQuote[]> {
         author: { $first: '$author' },
         year: { $first: '$year' },
         context: { $first: '$context' },
-        link: { $first: '$link' }
-      }
-    }
+        link: { $first: '$link' },
+      },
+    },
   ]);
 
   return result;

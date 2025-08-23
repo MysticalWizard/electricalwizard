@@ -146,11 +146,13 @@ async function handleRandomIdAutocomplete(
     const quotes = await QuoteModel.aggregate([
       { $match: matchQuery },
       { $sort: { _id: 1 } },
-      { $project: { 
-        quote: { $substr: ['$quote', 0, 40] }, 
-        author: 1,
-        _id: 1 
-      } },
+      {
+        $project: {
+          quote: { $substr: ['$quote', 0, 40] },
+          author: 1,
+          _id: 1,
+        },
+      },
       { $limit: Math.min(CONFIG.AUTOCOMPLETE_LIMIT, totalQuotes) },
     ]);
 
@@ -158,7 +160,8 @@ async function handleRandomIdAutocomplete(
     const choices = quotes.map((quote, index) => {
       const position = index + 1;
       // Quote is already truncated by projection, but handle edge cases
-      const preview = quote.quote.length === 40 ? `${quote.quote}...` : quote.quote;
+      const preview =
+        quote.quote.length === 40 ? `${quote.quote}...` : quote.quote;
 
       return {
         name: `#${position}: "${preview}" - ${quote.author}`,
@@ -167,9 +170,11 @@ async function handleRandomIdAutocomplete(
     });
 
     await interaction.respond(choices);
-    
+
     const duration = Date.now() - startTime;
-    console.log(`Random ID autocomplete took ${duration}ms (author: ${interaction.options.getString('author')}, results: ${choices.length})`);
+    console.log(
+      `Random ID autocomplete took ${duration}ms (author: ${interaction.options.getString('author')}, results: ${choices.length})`,
+    );
   } catch (error) {
     console.error('Error in random ID autocomplete:', error);
     const duration = Date.now() - startTime;
@@ -232,9 +237,11 @@ async function handleSearchAutocomplete(
       ? choices
       : [{ name: 'No matching entries found', value: 'not_found' }],
   );
-  
+
   const duration = Date.now() - startTime;
-  console.log(`Search autocomplete took ${duration}ms (${focusedOption.name}: ${focusedOption.value}, results: ${choices.length})`);
+  console.log(
+    `Search autocomplete took ${duration}ms (${focusedOption.name}: ${focusedOption.value}, results: ${choices.length})`,
+  );
 }
 
 /**
@@ -268,12 +275,14 @@ async function getDynamicContentChoices(
   const quotes = await QuoteModel.aggregate([
     { $match: query },
     { $sort: { _id: -1 } },
-    { $project: {
-      quote: { $substr: ['$quote', 0, 80] },
-      author: 1,
-      year: 1
-    }},
-    { $limit: CONFIG.AUTOCOMPLETE_LIMIT }
+    {
+      $project: {
+        quote: { $substr: ['$quote', 0, 80] },
+        author: 1,
+        year: 1,
+      },
+    },
+    { $limit: CONFIG.AUTOCOMPLETE_LIMIT },
   ]);
 
   return quotes.map((quote) => {
@@ -393,7 +402,6 @@ async function getDynamicYearChoices(
   });
 }
 
-
 async function getAuthorChoices(
   query: Record<string, unknown>,
   value: string,
@@ -423,7 +431,6 @@ async function getAuthorChoices(
       }));
   }
 }
-
 
 async function handleRandomCommand(
   interaction: ChatInputCommandInteraction,
@@ -483,9 +490,11 @@ async function handleRandomCommand(
         content: noQuotesMessage,
       });
     }
-    
+
     const duration = Date.now() - startTime;
-    console.log(`Random quote command took ${duration}ms (${n} quotes, id: ${id}, author: ${author})`);
+    console.log(
+      `Random quote command took ${duration}ms (${n} quotes, id: ${id}, author: ${author})`,
+    );
   } catch (error) {
     console.error('Error retrieving random quotes:', error);
     const duration = Date.now() - startTime;
@@ -544,9 +553,11 @@ async function handleSearchCommand(
         content: 'No matching quotes found.',
       });
     }
-    
+
     const duration = Date.now() - startTime;
-    console.log(`Search command took ${duration}ms (content: ${content}, author: ${author}, year: ${year}, results: ${searchResults.length})`);
+    console.log(
+      `Search command took ${duration}ms (content: ${content}, author: ${author}, year: ${year}, results: ${searchResults.length})`,
+    );
   } catch (error) {
     console.error('Error searching quotes:', error);
     const duration = Date.now() - startTime;
@@ -573,10 +584,10 @@ async function searchQuotes(
 
   // Use MongoDB text search for content, regex for others
   if (content) {
-    matchStage.$text = { 
+    matchStage.$text = {
       $search: content,
       $caseSensitive: false,
-      $diacriticSensitive: false 
+      $diacriticSensitive: false,
     };
     useTextSearch = true;
   }
@@ -597,8 +608,12 @@ async function searchQuotes(
 
   // Add text search score if using text search
   if (useTextSearch) {
-    pipeline.push({ $addFields: { score: { $meta: 'textScore' } } } as PipelineStage);
-    pipeline.push({ $sort: { score: { $meta: 'textScore' } } } as PipelineStage);
+    pipeline.push({
+      $addFields: { score: { $meta: 'textScore' } },
+    } as PipelineStage);
+    pipeline.push({
+      $sort: { score: { $meta: 'textScore' } },
+    } as PipelineStage);
   }
 
   // Add limit
@@ -613,9 +628,10 @@ async function searchQuotes(
       (quote: IQuote & { score?: number }) =>
         ({
           ...quote,
-          relevance: useTextSearch && quote.score ? 
-            quote.score + calculateRelevance(quote, undefined, author, year) :
-            calculateRelevance(quote, content, author, year),
+          relevance:
+            useTextSearch && quote.score
+              ? quote.score + calculateRelevance(quote, undefined, author, year)
+              : calculateRelevance(quote, content, author, year),
         }) as QuoteWithRelevance,
     )
     .sort((a, b) => b.relevance - a.relevance);
@@ -652,7 +668,6 @@ function calculateRelevance(
 
   return relevance;
 }
-
 
 function formatSearchResults(quotes: QuoteWithRelevance[]): string {
   return quotes

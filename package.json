@@ -24,14 +24,14 @@
   "dependencies": {
     "chalk": "^5.6.0",
     "dayjs": "^1.11.13",
-    "discord.js": "^14.21.0",
+    "discord.js": "^14.22.1",
     "dotenv": "^16.6.1",
-    "mongoose": "^8.17.1"
+    "mongoose": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.17.2",
-    "@typescript-eslint/eslint-plugin": "^8.39.1",
-    "@typescript-eslint/parser": "^8.39.1",
+    "@typescript-eslint/eslint-plugin": "^8.40.0",
+    "@typescript-eslint/parser": "^8.40.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-import": "^2.32.0",
