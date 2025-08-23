@@ -2,6 +2,7 @@ import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import chalk from 'chalk';
 import config from '@/config.js';
 import { dbService } from '@/services/database.js';
+import { reminderService } from '@/services/reminder.js';
 import { loadCommands, loadEvents } from '@/utils/loaders.js';
 
 /**
@@ -27,6 +28,8 @@ async function main() {
     loadEvents(client);
 
     await client.login(config.bot.token);
+
+    reminderService.initialize(client);
   } catch (error) {
     console.error('Failed to start the bot:', error);
     await dbService.disconnect();
