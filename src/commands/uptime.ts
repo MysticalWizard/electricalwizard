@@ -26,11 +26,14 @@ const command: SlashCommand = {
     // Check permissions for detailed view
     if (showDetailed) {
       const isOwner = interaction.user.id === config.bot.ownerId;
-      const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) || false;
-      
+      const isAdmin =
+        interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
+        false;
+
       if (!isOwner && !isAdmin) {
         await interaction.reply({
-          content: 'You need Administrator permissions or be the bot owner to view detailed statistics.',
+          content:
+            'You need Administrator permissions or be the bot owner to view detailed statistics.',
           ephemeral: true,
         });
         return;
