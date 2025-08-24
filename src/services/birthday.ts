@@ -19,7 +19,9 @@ export class BirthdayService {
   }
 
   public async startBirthdayCheck(): Promise<void> {
-    console.log(`Starting birthday check service (interval: 1 hr)`);
+    if (config.logging.debug) {
+      console.log(`Starting birthday check service (interval: 1 hr)`);
+    }
 
     // Stop any existing interval
     if (this.checkInterval) {
@@ -41,16 +43,20 @@ export class BirthdayService {
       );
     }, msUntilNextHour);
 
-    console.log(
-      `Next birthday check scheduled for ${nextHour.format('YYYY-MM-DD HH:mm:ss')}`,
-    );
+    if (config.logging.debug) {
+      console.log(
+        `Next birthday check scheduled for ${nextHour.format('YYYY-MM-DD HH:mm:ss')}`,
+      );
+    }
   }
 
   public stopBirthdayCheck(): void {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
-      console.log('Birthday check service stopped');
+      if (config.logging.debug) {
+        console.log('Birthday check service stopped');
+      }
     }
   }
 
@@ -66,7 +72,9 @@ export class BirthdayService {
   }
 
   private async checkBirthdays(): Promise<void> {
-    console.log('Checking for birthdays...');
+    if (config.logging.debug) {
+      console.log('Checking for birthdays...');
+    }
 
     try {
       const users = await UserModel.find({ birthday: { $exists: true } });

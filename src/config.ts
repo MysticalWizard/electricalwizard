@@ -11,6 +11,12 @@ const config = {
     status: process.env.STATUS || '',
     env: process.env.NODE_ENV || 'development',
   },
+  logging: {
+    debug: process.env.NODE_ENV === 'development',
+    performance:
+      process.env.LOG_PERFORMANCE === 'true' ||
+      process.env.NODE_ENV === 'development',
+  },
   guild: {
     id: process.env.GUILD_ID || '',
   },

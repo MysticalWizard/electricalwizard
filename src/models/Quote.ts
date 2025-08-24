@@ -18,8 +18,7 @@ const QuoteSchema = new Schema({
 });
 
 // Add indexes for better query performance
-QuoteSchema.index({ author: 1, year: 1 }); // Compound for author+year queries
-QuoteSchema.index({ year: 1, author: 1 }); // Reverse for year+author queries
+QuoteSchema.index({ author: 1, year: 1 }); // Compound for author+year and author-only queries
 QuoteSchema.index(
   { author: 'text', quote: 'text' },
   {
@@ -27,9 +26,6 @@ QuoteSchema.index(
     name: 'search_index',
   },
 ); // Enhanced text search with weights
-QuoteSchema.index({ _id: 1 }, { background: true }); // Explicit for sorting
-QuoteSchema.index({ author: 1 }); // Keep individual author index
-QuoteSchema.index({ year: 1 }); // Keep individual year index
 
 const QuoteModel = model<IQuote>('Quote', QuoteSchema);
 

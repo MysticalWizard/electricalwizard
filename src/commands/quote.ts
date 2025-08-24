@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import QuoteModel, { IQuote } from '@/models/Quote.js';
 import { SlashCommand } from '@/types';
+import config from '@/config.js';
 import type { PipelineStage } from 'mongoose';
 
 // Configuration
@@ -172,13 +173,17 @@ async function handleRandomIdAutocomplete(
     await interaction.respond(choices);
 
     const duration = Date.now() - startTime;
-    console.log(
-      `Random ID autocomplete took ${duration}ms (author: ${interaction.options.getString('author')}, results: ${choices.length})`,
-    );
+    if (config.logging.performance) {
+      console.log(
+        `Random ID autocomplete took ${duration}ms (author: ${interaction.options.getString('author')}, results: ${choices.length})`,
+      );
+    }
   } catch (error) {
     console.error('Error in random ID autocomplete:', error);
     const duration = Date.now() - startTime;
-    console.log(`Random ID autocomplete failed after ${duration}ms:`, error);
+    if (config.logging.debug) {
+      console.log(`Random ID autocomplete failed after ${duration}ms:`, error);
+    }
     await interaction.respond([{ name: 'Error retrieving quotes', value: 0 }]);
   }
 }
@@ -239,9 +244,11 @@ async function handleSearchAutocomplete(
   );
 
   const duration = Date.now() - startTime;
-  console.log(
-    `Search autocomplete took ${duration}ms (${focusedOption.name}: ${focusedOption.value}, results: ${choices.length})`,
-  );
+  if (config.logging.performance) {
+    console.log(
+      `Search autocomplete took ${duration}ms (${focusedOption.name}: ${focusedOption.value}, results: ${choices.length})`,
+    );
+  }
 }
 
 /**
@@ -492,13 +499,17 @@ async function handleRandomCommand(
     }
 
     const duration = Date.now() - startTime;
-    console.log(
-      `Random quote command took ${duration}ms (${n} quotes, id: ${id}, author: ${author})`,
-    );
+    if (config.logging.performance) {
+      console.log(
+        `Random quote command took ${duration}ms (${n} quotes, id: ${id}, author: ${author})`,
+      );
+    }
   } catch (error) {
     console.error('Error retrieving random quotes:', error);
     const duration = Date.now() - startTime;
-    console.log(`Random quote command failed after ${duration}ms:`, error);
+    if (config.logging.debug) {
+      console.log(`Random quote command failed after ${duration}ms:`, error);
+    }
     await interaction.editReply({
       content:
         'An error occurred while retrieving quotes. Please try again later.',
@@ -555,13 +566,17 @@ async function handleSearchCommand(
     }
 
     const duration = Date.now() - startTime;
-    console.log(
-      `Search command took ${duration}ms (content: ${content}, author: ${author}, year: ${year}, results: ${searchResults.length})`,
-    );
+    if (config.logging.performance) {
+      console.log(
+        `Search command took ${duration}ms (content: ${content}, author: ${author}, year: ${year}, results: ${searchResults.length})`,
+      );
+    }
   } catch (error) {
     console.error('Error searching quotes:', error);
     const duration = Date.now() - startTime;
-    console.log(`Search command failed after ${duration}ms:`, error);
+    if (config.logging.debug) {
+      console.log(`Search command failed after ${duration}ms:`, error);
+    }
     await interaction.editReply({
       content:
         'An error occurred while searching quotes. Please try again later.',
