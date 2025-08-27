@@ -1,8 +1,8 @@
 import { Events, Message } from 'discord.js';
-import QuoteModel from '@/models/Quote.js';
 import UserModel from '@/models/User.js';
 import { Event } from '@/types';
 import { formatAuthorName } from '@/utils/helpers.js';
+import { QuoteService } from '@/services/quote.js';
 
 const event: Event<Events.MessageCreate> = {
   name: Events.MessageCreate,
@@ -37,27 +37,19 @@ async function handleQuoteCommand(message: Message): Promise<void> {
       referencedMessage.author.username,
     );
 
-    const newQuote = new QuoteModel({
+    const result = await QuoteService.addQuote({
       quote: referencedMessage.content,
       author: author,
-      context: null,
       year: referencedMessage.createdAt.getFullYear(),
     });
 
-    await newQuote.save();
-
-    const quoteCount = await QuoteModel.countDocuments();
-
-    const formattedQuote = `“${referencedMessage.content}” — ${author}, ${newQuote.year}`;
-
-    await message.reply(
-      `Quote #${quoteCount} added!\nFormatted quote: ${formattedQuote}`,
-    );
+    await message.reply({ embeds: [result.embed] });
   } catch (error) {
     console.error('Error adding quote:', error);
-    await message.reply(
-      'There was an error while adding the quote. Please try again later.',
-    );
+    await message.reply({
+      content:
+        'There was an error while adding the quote. Please try again later.',
+    });
   }
 }
 

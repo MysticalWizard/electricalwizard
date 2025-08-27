@@ -4,8 +4,7 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
-import { Types } from 'mongoose';
-import QuoteModel from '@/models/Quote.js';
+import { QuoteService } from '@/services/quote.js';
 import { SlashCommand } from '@/types';
 
 const command: SlashCommand = {
@@ -80,103 +79,24 @@ const command: SlashCommand = {
     const linkId = interaction.options.getString('link');
     const overrideId = interaction.options.getString('override');
 
-    try {
-      if (overrideId) {
-        // Check if the user has administrator permissions
-        if (
-          !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)
-        ) {
-          await interaction.editReply(
-            'Error: You need administrator permissions to override quotes.',
-          );
-          return;
-        }
+    const result = await QuoteService.addQuote(
+      {
+        quote: quoteContent,
+        author,
+        year,
+        context: context || undefined,
+        linkId: linkId || undefined,
+      },
+      {
+        allowOverride: !!overrideId,
+        isAdmin: !!interaction.memberPermissions?.has(
+          PermissionFlagsBits.Administrator,
+        ),
+        overrideId: overrideId || undefined,
+      },
+    );
 
-        // Check if the quote to override exists
-        const existingQuote = await QuoteModel.findById(overrideId);
-        if (!existingQuote) {
-          await interaction.editReply('Error: Quote to override not found.');
-          return;
-        }
-
-        // Update the existing quote
-        existingQuote.quote = quoteContent;
-        existingQuote.author = author;
-        existingQuote.year = year;
-        if (context) {
-          existingQuote.context = context;
-        }
-        if (linkId) {
-          existingQuote.link = new Types.ObjectId(linkId);
-        }
-
-        await existingQuote.save();
-
-        const formattedQuote = `"${quoteContent}" — ${author}${context ? `, ${context}` : ''}, ${year}`;
-        await interaction.editReply(
-          `Quote #${overrideId} updated!\nFormatted quote: ${formattedQuote}`,
-        );
-      } else {
-        // Existing code for adding a new quote
-        if (linkId) {
-          // Check for double links
-          const existingLink = await QuoteModel.findOne({ link: linkId });
-          if (existingLink) {
-            await interaction.editReply(
-              'Error: Double link. This quote is already linked to another quote.',
-            );
-            return;
-          }
-
-          // Check for circular links and maximum chain length
-          const chainLength = await checkCircularAndChainLength(linkId);
-          if (chainLength === -1) {
-            await interaction.editReply('Error: Circular link detected.');
-            return;
-          }
-          if (chainLength >= 5) {
-            await interaction.editReply(
-              'Error: Maximum chain length (5) reached.',
-            );
-            return;
-          }
-        }
-
-        const newQuote = new QuoteModel({
-          quote: quoteContent,
-          author,
-          year,
-          context,
-          link: linkId ? new Types.ObjectId(linkId) : undefined,
-        });
-
-        await newQuote.save();
-
-        const quoteCount = await QuoteModel.countDocuments();
-        const formattedQuote = `"${quoteContent}" — ${author}${context ? `, ${context}` : ''}, ${year}`;
-
-        let replyContent = `Quote #${quoteCount} added!\nFormatted quote: ${formattedQuote}`;
-
-        if (linkId) {
-          const linkedQuote = await QuoteModel.findById(linkId);
-          if (linkedQuote) {
-            const truncatedQuote =
-              linkedQuote.quote.length > 50
-                ? `${linkedQuote.quote.substring(0, 50)}...`
-                : linkedQuote.quote;
-            replyContent += `\nLinked to: "${truncatedQuote}" (#${linkedQuote._id})`;
-          }
-        }
-
-        await interaction.editReply(replyContent);
-      }
-    } catch (error) {
-      console.error('Error adding or updating quote:', error);
-      await interaction.editReply({
-        content:
-          'There was an error while adding or updating the quote. Please try again later.',
-      });
-    }
+    await interaction.editReply({ embeds: [result.embed] });
   },
 };
 
@@ -184,27 +104,7 @@ async function handleAuthorAutocomplete(
   interaction: AutocompleteInteraction,
   focusedValue: string,
 ) {
-  // Fetch the 5 most popular authors
-  const popularAuthors = await QuoteModel.aggregate([
-    { $group: { _id: '$author', count: { $sum: 1 } } },
-    { $sort: { count: -1 } },
-    { $limit: 5 },
-    { $project: { _id: 0, author: '$_id' } },
-  ]);
-
-  // Fetch the most recent author
-  const recentAuthor = await QuoteModel.findOne()
-    .sort({ _id: -1 })
-    .select('author');
-
-  // Combine popular authors and recent author, removing duplicates
-  const choices = [
-    ...new Set([
-      ...popularAuthors.map((a) => a.author),
-      recentAuthor ? recentAuthor.author : '',
-    ]),
-  ].filter(Boolean);
-
+  const choices = await QuoteService.getAutocompleteChoices('author');
   const filtered = choices.filter((choice) =>
     choice.toLowerCase().startsWith(focusedValue.toLowerCase()),
   );
@@ -217,48 +117,8 @@ async function handleQuoteAutocomplete(
   interaction: AutocompleteInteraction,
   count: number,
 ) {
-  // Fetch the 5 most recent quotes
-  const recentQuotes = await QuoteModel.find()
-    .sort({ _id: -1 })
-    .limit(count)
-    .lean();
-
-  const choices = recentQuotes.map((quote) => ({
-    name: `${quote.quote.substring(0, 50)}...`,
-    value: quote._id.toString(),
-  }));
-
+  const choices = await QuoteService.getAutocompleteChoices('quote', count);
   await interaction.respond(choices);
-}
-
-async function checkCircularAndChainLength(quoteId: string): Promise<number> {
-  const result = await QuoteModel.aggregate([
-    { $match: { _id: new Types.ObjectId(quoteId) } },
-    {
-      $graphLookup: {
-        from: 'quotes',
-        startWith: '$link',
-        connectFromField: 'link',
-        connectToField: '_id',
-        as: 'chain',
-        maxDepth: 10,
-        depthField: 'depth',
-      },
-    },
-    {
-      $project: {
-        chainLength: { $add: [{ $size: '$chain' }, 1] },
-        hasCircular: {
-          $gt: [{ $size: { $setIntersection: [['$_id'], '$chain._id'] } }, 0],
-        },
-      },
-    },
-  ]);
-
-  if (result.length === 0) return 1;
-
-  const { chainLength, hasCircular } = result[0];
-  return hasCircular ? -1 : chainLength;
 }
 
 export default command;

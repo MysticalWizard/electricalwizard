@@ -7,11 +7,12 @@ import QuoteModel, { IQuote } from '@/models/Quote.js';
 import { SlashCommand } from '@/types';
 import config from '@/config.js';
 import type { PipelineStage } from 'mongoose';
+import { PaginationManager, PaginationItem } from '@/utils/pagination.js';
 
 // Configuration
 const CONFIG = {
-  MAX_SEARCH_RESULTS: 10,
   AUTOCOMPLETE_LIMIT: 25,
+  PAGINATION_ITEMS_PER_PAGE: 5,
   RELEVANCY_WEIGHTS: {
     exactMatch: 10,
     partialMatch: 5,
@@ -48,7 +49,7 @@ const command: SlashCommand = {
             .setName('count')
             .setDescription('Number of random quotes to retrieve (1-10)')
             .setMinValue(1)
-            .setMaxValue(CONFIG.MAX_SEARCH_RESULTS),
+            .setMaxValue(10),
         ),
     )
     .addSubcommand((subcommand) =>
@@ -72,13 +73,6 @@ const command: SlashCommand = {
             .setName('year')
             .setDescription('Search for quotes from this year')
             .setAutocomplete(true),
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName('count')
-            .setDescription('Number of quotes to retrieve (1-10)')
-            .setMinValue(1)
-            .setMaxValue(CONFIG.MAX_SEARCH_RESULTS),
         ),
     ) as SlashCommandBuilder,
 
@@ -100,12 +94,12 @@ const command: SlashCommand = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     const subcommand = interaction.options.getSubcommand();
-    const count = interaction.options.getInteger('count') || 1;
 
     if (subcommand === 'random') {
+      const count = interaction.options.getInteger('count') || 1;
       await handleRandomCommand(interaction, count);
     } else if (subcommand === 'search') {
-      await handleSearchCommand(interaction, count);
+      await handleSearchCommand(interaction);
     }
   },
 };
@@ -527,10 +521,7 @@ function formatRandomQuotes(quotes: IQuote[]): string {
     .join('\n\n');
 }
 
-async function handleSearchCommand(
-  interaction: ChatInputCommandInteraction,
-  n: number,
-) {
+async function handleSearchCommand(interaction: ChatInputCommandInteraction) {
   const startTime = Date.now();
   await interaction.deferReply();
 
@@ -554,11 +545,42 @@ async function handleSearchCommand(
   }
 
   try {
-    const searchResults = await searchQuotes(content, author, year, n);
+    const searchResults = await searchQuotes(content, author, year);
 
     if (searchResults.length > 0) {
-      const response = formatSearchResults(searchResults);
-      await interaction.editReply(response);
+      // Convert quotes to pagination items
+      const paginationItems: PaginationItem[] = searchResults.map((quote) => {
+        const context = quote.context ? `, ${quote.context}` : '';
+        const formattedQuote = `"${quote.quote}" — ${quote.author}${context}, ${quote.year}`;
+
+        return {
+          id: quote._id.toString(),
+          title: `${quote.author} (${quote.year})`,
+          description: formattedQuote,
+        };
+      });
+
+      // Create search parameters summary
+      const searchParams = [];
+      if (content) searchParams.push(`content: "${content}"`);
+      if (author) searchParams.push(`author: "${author}"`);
+      if (year) searchParams.push(`year: ${year}`);
+
+      const embedTitle = `Quote Search Results - ${searchParams.join(', ')}`;
+
+      // Set up pagination
+      const pagination = new PaginationManager(paginationItems, {
+        itemsPerPage: CONFIG.PAGINATION_ITEMS_PER_PAGE,
+        embedTitle,
+        embedColor: 0x0099ff,
+        showPageNumbers: true,
+        showItemCount: true,
+        timeout: 300000, // 5 minutes
+      });
+
+      await interaction.editReply({ content: 'Setting up results...' });
+      const message = await interaction.fetchReply();
+      await pagination.start(message);
     } else {
       await interaction.editReply({
         content: 'No matching quotes found.',
@@ -588,23 +610,16 @@ async function searchQuotes(
   content?: string,
   author?: string,
   year?: number,
-  count: number = 1,
 ): Promise<QuoteWithRelevance[]> {
   // Build the aggregation pipeline
   const pipeline: PipelineStage[] = [];
 
   // Match stage for filtering
   const matchStage: Record<string, unknown> = {};
-  let useTextSearch = false;
 
-  // Use MongoDB text search for content, regex for others
+  // Use regex for content matching (same as autocomplete)
   if (content) {
-    matchStage.$text = {
-      $search: content,
-      $caseSensitive: false,
-      $diacriticSensitive: false,
-    };
-    useTextSearch = true;
+    matchStage.quote = new RegExp(content, 'i');
   }
 
   // Safely create regex patterns for author
@@ -621,18 +636,10 @@ async function searchQuotes(
     pipeline.push({ $match: matchStage } as PipelineStage);
   }
 
-  // Add text search score if using text search
-  if (useTextSearch) {
-    pipeline.push({
-      $addFields: { score: { $meta: 'textScore' } },
-    } as PipelineStage);
-    pipeline.push({
-      $sort: { score: { $meta: 'textScore' } },
-    } as PipelineStage);
-  }
+  // Sort by _id for consistent ordering
+  pipeline.push({ $sort: { _id: -1 } } as PipelineStage);
 
-  // Add limit
-  pipeline.push({ $limit: count } as PipelineStage);
+  // No limit - return all matching results
 
   // Execute the pipeline
   const quotes = await QuoteModel.aggregate(pipeline);
@@ -640,13 +647,10 @@ async function searchQuotes(
   // Calculate relevance scores for sorting
   return quotes
     .map(
-      (quote: IQuote & { score?: number }) =>
+      (quote: IQuote) =>
         ({
           ...quote,
-          relevance:
-            useTextSearch && quote.score
-              ? quote.score + calculateRelevance(quote, undefined, author, year)
-              : calculateRelevance(quote, content, author, year),
+          relevance: calculateRelevance(quote, content, author, year),
         }) as QuoteWithRelevance,
     )
     .sort((a, b) => b.relevance - a.relevance);
@@ -660,7 +664,7 @@ function calculateRelevance(
 ): number {
   let relevance = 0;
 
-  // Only calculate content relevance if not using text search
+  // Calculate content relevance
   if (content) {
     const quoteLower = quote.quote.toLowerCase();
     const contentLower = content.toLowerCase();
@@ -670,7 +674,6 @@ function calculateRelevance(
     } else if (quoteLower.includes(contentLower)) {
       relevance += CONFIG.RELEVANCY_WEIGHTS.partialMatch;
     }
-    // Removed expensive Levenshtein distance calculation
   }
 
   if (author && quote.author.toLowerCase() === author.toLowerCase()) {
@@ -682,18 +685,6 @@ function calculateRelevance(
   }
 
   return relevance;
-}
-
-function formatSearchResults(quotes: QuoteWithRelevance[]): string {
-  return quotes
-    .map((quote) => {
-      // For multi-line quotes, handle each line with a quote marker
-      const quoteLines = quote.quote.split('\n');
-      const formattedQuote = quoteLines.map((line) => `> "${line}"`).join('\n');
-
-      return `**${quote.author}**, ${quote.year}\n${formattedQuote}`;
-    })
-    .join('\n\n');
 }
 
 export default command;
