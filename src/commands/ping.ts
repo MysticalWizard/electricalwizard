@@ -4,6 +4,7 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import { SlashCommand } from '@/types';
+import { EmbedColors } from '@/utils/embeds.js';
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder().setName('ping').setDescription('Pong!'),
@@ -13,7 +14,7 @@ const command: SlashCommand = {
     const clientLatency = Date.now() - interaction.createdTimestamp;
     const apiLatency = Math.round(interaction.client.ws.ping);
     const embed = new EmbedBuilder()
-      .setColor('#0099ff')
+      .setColor(EmbedColors.PRIMARY)
       .setTitle(':ping_pong: Pong!')
       .setDescription(
         `Latency is ${clientLatency}ms. API Latency is ${apiLatency}ms.`,

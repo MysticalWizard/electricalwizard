@@ -6,6 +6,7 @@ import {
   Guild,
 } from 'discord.js';
 import { SlashCommand } from '@/types';
+import { EmbedColors } from '@/utils/embeds.js';
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -110,7 +111,7 @@ function createUserAvatarEmbed(user: User): EmbedBuilder {
     .setTitle(`${user.displayName}'s Avatar`)
     .setDescription(`**${user.tag}** (${user.id})`)
     .setImage(avatarUrl)
-    .setColor(0x5865f2)
+    .setColor(EmbedColors.DISCORD_BLURPLE)
     .setFooter({
       text: 'Download Links',
       iconURL: user.displayAvatarURL({ size: 32 }),
@@ -138,7 +139,7 @@ async function createGuildAvatarEmbed(guild: Guild): Promise<EmbedBuilder> {
     .setTitle(`${guild.name}'s Avatar`)
     .setDescription(`**${guild.name}** (${guild.id})`)
     .setImage(iconUrl)
-    .setColor(0x5865f2)
+    .setColor(EmbedColors.DISCORD_BLURPLE)
     .setFooter({
       text: 'Download Links',
       iconURL: guild.iconURL({ size: 32 }) || undefined,

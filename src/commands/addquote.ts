@@ -104,20 +104,15 @@ async function handleAuthorAutocomplete(
   interaction: AutocompleteInteraction,
   focusedValue: string,
 ) {
-  const choices = await QuoteService.getAutocompleteChoices('author');
-  const filtered = choices.filter((choice) =>
-    choice.toLowerCase().startsWith(focusedValue.toLowerCase()),
-  );
-  await interaction.respond(
-    filtered.map((choice) => ({ name: choice, value: choice })),
-  );
+  const choices = await QuoteService.getAuthorAutocomplete(focusedValue);
+  await interaction.respond(choices);
 }
 
 async function handleQuoteAutocomplete(
   interaction: AutocompleteInteraction,
   count: number,
 ) {
-  const choices = await QuoteService.getAutocompleteChoices('quote', count);
+  const choices = await QuoteService.getQuoteAutocomplete(count);
   await interaction.respond(choices);
 }
 

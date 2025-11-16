@@ -4,8 +4,10 @@ import {
   Events,
   Interaction,
 } from 'discord.js';
-import QuoteModel, { IQuote } from '@/models/Quote.js';
+import QuoteModel from '@/models/Quote.js';
 import { Event, SlashCommand } from '@/types';
+import { safeReply } from '@/utils/interactions.js';
+import { QuoteService } from '@/services/quote.js';
 
 const handleAutocomplete = async (interaction: AutocompleteInteraction) => {
   const command = interaction.client.commands.get(
@@ -40,16 +42,11 @@ const handleCommand = async (interaction: Interaction) => {
     await command.execute(interaction);
   } catch (error) {
     console.error('Error executing command:', error);
-    const reply = {
-      content: 'There was an error while executing this command!',
-      ephemeral: true,
-    };
-
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(reply);
-    } else {
-      await interaction.reply(reply);
-    }
+    await safeReply(
+      interaction,
+      'There was an error while executing this command!',
+      true,
+    );
   }
 };
 
@@ -92,8 +89,8 @@ async function handleQuoteDeletionButton(interaction: ButtonInteraction) {
       }
 
       if (deleteChain) {
-        // Delete all quotes in the chain
-        const quotesToDelete = await getQuoteChain(quote);
+        // Delete all quotes in the chain using QuoteService
+        const quotesToDelete = await QuoteService.getQuoteChain(quote);
         const deletedCount = quotesToDelete.length;
 
         // Get all quote numbers
@@ -142,35 +139,6 @@ async function handleQuoteDeletionButton(interaction: ButtonInteraction) {
       components: [],
     });
   }
-}
-
-// Helper function to get all quotes in a chain
-async function getQuoteChain(
-  quote: IQuote,
-  visited: Set<string> = new Set(),
-): Promise<IQuote[]> {
-  const chain = [quote];
-  visited.add(quote._id.toString());
-
-  // Find quotes that link to this quote
-  const linkedToThisQuote = await QuoteModel.find({ link: quote._id });
-  for (const linkedQuote of linkedToThisQuote) {
-    if (!visited.has(linkedQuote._id.toString())) {
-      const subChain = await getQuoteChain(linkedQuote, visited);
-      chain.push(...subChain);
-    }
-  }
-
-  // Follow the link if this quote has one
-  if (quote.link && !visited.has(quote.link.toString())) {
-    const linkedQuote = await QuoteModel.findById(quote.link);
-    if (linkedQuote) {
-      const subChain = await getQuoteChain(linkedQuote, visited);
-      chain.push(...subChain);
-    }
-  }
-
-  return chain;
 }
 
 const event: Event<Events.InteractionCreate> = {

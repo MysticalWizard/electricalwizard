@@ -5,8 +5,9 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 import StatusModel from '@/models/Status.js';
-import UserModel from '@/models/User.js';
 import { SlashCommand } from '@/types';
+import { isOwnerOrAdmin, replyPermissionDenied } from '@/utils/permissions.js';
+import { UserService } from '@/services/user.js';
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -25,14 +26,22 @@ const command: SlashCommand = {
   execute: async (interaction: ChatInputCommandInteraction) => {
     if (!interaction.isChatInputCommand()) return;
 
+    // Check if user is bot owner or has administrator permissions
+    if (!isOwnerOrAdmin(interaction)) {
+      await replyPermissionDenied(
+        interaction,
+        'You need Administrator permissions or be the bot owner to change the status.',
+      );
+      return;
+    }
+
     const newStatus = interaction.options.getString('message', true);
 
     try {
-      // Find or create the user in the UserModel
-      const user = await UserModel.findOneAndUpdate(
-        { userId: interaction.user.id },
-        { username: interaction.user.username },
-        { upsert: true, new: true },
+      // Find or create the user using UserService
+      const user = await UserService.findOrCreateUser(
+        interaction.user.id,
+        interaction.user.username,
       );
 
       // Update the status

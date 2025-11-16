@@ -32,7 +32,7 @@ const config = {
 };
 
 // Validate required configuration
-const requiredEnvVars = ['BOT_TOKEN', 'CLIENT_ID'];
+const requiredEnvVars = ['BOT_TOKEN', 'CLIENT_ID', 'OWNER_ID'];
 for (const envVar of requiredEnvVars) {
   if (!process.env[envVar]) {
     throw new Error(`Missing required environment variable: ${envVar}`);

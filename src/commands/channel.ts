@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import GuildModel from '@/models/Guild.js';
 import { SlashCommand } from '@/types';
+import { isOwnerOrAdmin, replyPermissionDenied } from '@/utils/permissions.js';
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -39,6 +40,15 @@ const command: SlashCommand = {
         content: 'This command can only be used in a server.',
         ephemeral: true,
       });
+      return;
+    }
+
+    // Check if user is bot owner or has administrator permissions
+    if (!isOwnerOrAdmin(interaction)) {
+      await replyPermissionDenied(
+        interaction,
+        'You need Administrator permissions or be the bot owner to configure channels.',
+      );
       return;
     }
 

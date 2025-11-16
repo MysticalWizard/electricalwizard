@@ -22,26 +22,26 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "chalk": "^5.6.0",
-    "dayjs": "^1.11.14",
-    "discord.js": "^14.22.1",
+    "chalk": "^5.6.2",
+    "dayjs": "^1.11.19",
+    "discord.js": "^14.24.2",
     "dotenv": "^16.6.1",
-    "mongoose": "^8.18.0"
+    "mongoose": "^8.19.4"
   },
   "devDependencies": {
-    "@types/node": "^22.18.0",
-    "@typescript-eslint/eslint-plugin": "^8.41.0",
-    "@typescript-eslint/parser": "^8.41.0",
+    "@types/node": "^22.19.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
-    "pm2": "^6.0.8",
+    "pm2": "^6.0.13",
     "prettier": "^3.6.2",
-    "rimraf": "^6.0.1",
+    "rimraf": "^6.1.0",
     "tsc-alias": "^1.8.16",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   },
-  "packageManager": "pnpm@10.11.0+sha512.6540583f41cc5f628eb3d9773ecee802f4f9ef9923cc45b69890fb47991d4b092964694ec3a4f738a420c918a333062c8b925d312f42e4f0c263eb603551f977"
+  "packageManager": "pnpm@10.20.0+sha512.cf9998222162dd85864d0a8102e7892e7ba4ceadebbf5a31f9c2fce48dfce317a9c53b9f6464d1ef9042cba2e02ae02a9f7c143a2b438cd93c91840f0192b9dd"
 }

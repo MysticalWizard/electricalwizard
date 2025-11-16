@@ -7,8 +7,11 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from 'discord.js';
-import QuoteModel, { IQuote } from '@/models/Quote.js';
+import QuoteModel from '@/models/Quote.js';
 import { SlashCommand } from '@/types';
+import { isOwnerOrAdmin, replyPermissionDenied } from '@/utils/permissions.js';
+import { QuoteService } from '@/services/quote.js';
+import { truncate, formatQuote } from '@/utils/strings.js';
 
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -53,10 +56,7 @@ const command: SlashCommand = {
       }
 
       const choices = quotes.map((quote) => {
-        const truncatedQuote =
-          quote.quote.length > 50
-            ? `${quote.quote.substring(0, 50)}...`
-            : quote.quote;
+        const truncatedQuote = truncate(quote.quote, 50);
         return {
           name: `${truncatedQuote} - ${quote.author}`,
           value: quote._id.toString(),
@@ -71,6 +71,15 @@ const command: SlashCommand = {
   },
 
   execute: async (interaction: ChatInputCommandInteraction) => {
+    // Check if user is bot owner or has administrator permissions
+    if (!isOwnerOrAdmin(interaction)) {
+      await replyPermissionDenied(
+        interaction,
+        'You need Administrator permissions or be the bot owner to delete quotes.',
+      );
+      return;
+    }
+
     await interaction.deferReply();
 
     const quoteId = interaction.options.getString('quote', true);
@@ -91,12 +100,12 @@ const command: SlashCommand = {
 
       // Find all quotes in the chain if requested
       const formattedQuotes = [
-        `Quote #${quoteNumber}: "${quote.quote}" — ${quote.author}, ${quote.year}`,
+        `Quote #${quoteNumber}: ${formatQuote(quote.quote, quote.author, quote.year, quote.context)}`,
       ];
 
       if (deleteChain) {
-        // Get all linked quotes
-        const linkedQuotes = await getQuoteChain(quote);
+        // Get all linked quotes using QuoteService
+        const linkedQuotes = await QuoteService.getQuoteChain(quote);
 
         // Format all quotes for display
         for (const linkedQuote of linkedQuotes) {
@@ -105,7 +114,7 @@ const command: SlashCommand = {
               _id: { $lte: linkedQuote._id },
             });
             formattedQuotes.push(
-              `Quote #${linkedQuoteNumber}: "${linkedQuote.quote}" — ${linkedQuote.author}, ${linkedQuote.year}`,
+              `Quote #${linkedQuoteNumber}: ${formatQuote(linkedQuote.quote, linkedQuote.author, linkedQuote.year, linkedQuote.context)}`,
             );
           }
         }
@@ -144,68 +153,5 @@ const command: SlashCommand = {
     }
   },
 };
-
-// Helper function to get all quotes in a chain using aggregation
-async function getQuoteChain(quote: IQuote): Promise<IQuote[]> {
-  const result = await QuoteModel.aggregate([
-    { $match: { _id: quote._id } },
-    {
-      $graphLookup: {
-        from: 'quotes',
-        startWith: '$_id',
-        connectFromField: 'link',
-        connectToField: '_id',
-        as: 'linkedQuotes',
-        maxDepth: 10,
-        depthField: 'depth',
-      },
-    },
-    {
-      $graphLookup: {
-        from: 'quotes',
-        startWith: '$_id',
-        connectFromField: '_id',
-        connectToField: 'link',
-        as: 'linkingQuotes',
-        maxDepth: 10,
-        depthField: 'depth',
-      },
-    },
-    {
-      $project: {
-        allQuotes: {
-          $concatArrays: [
-            [
-              {
-                _id: '$_id',
-                quote: '$quote',
-                author: '$author',
-                year: '$year',
-                context: '$context',
-                link: '$link',
-              },
-            ],
-            '$linkedQuotes',
-            '$linkingQuotes',
-          ],
-        },
-      },
-    },
-    { $unwind: '$allQuotes' },
-    { $replaceRoot: { newRoot: '$allQuotes' } },
-    {
-      $group: {
-        _id: '$_id',
-        quote: { $first: '$quote' },
-        author: { $first: '$author' },
-        year: { $first: '$year' },
-        context: { $first: '$context' },
-        link: { $first: '$link' },
-      },
-    },
-  ]);
-
-  return result;
-}
 
 export default command;
