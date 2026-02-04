@@ -1,16 +1,15 @@
-import { Events, Guild } from 'discord.js';
-import GuildModel from '@/models/Guild.js';
-import { Event } from '@/types';
+import { Events } from 'discord.js';
+import type { Event } from '@/types.js';
+import { Guild } from '@/models/Guild.js';
 
-const event: Event<Events.GuildCreate> = {
+export const event: Event<Events.GuildCreate> = {
   name: Events.GuildCreate,
-  execute: async (guild: Guild) => {
-    try {
-      await GuildModel.create({ guildId: guild.id });
-    } catch (error) {
-      console.error('Error creating guild document:', error);
-    }
+  once: false,
+  async execute(guild) {
+    await Guild.findOneAndUpdate(
+      { guildId: guild.id },
+      { $set: { name: guild.name } },
+      { upsert: true },
+    );
   },
 };
-
-export default event;

@@ -1,38 +1,56 @@
-import { Document, SaveOptions, Schema, model } from 'mongoose';
+import { Schema, model, type Document } from 'mongoose';
 
 export interface IUser extends Document {
-  userId: string;
+  discordId: string;
   username: string;
   name: {
-    first: {
-      given: string;
-      preferred: string;
-    };
-    family: string;
+    first?: string;
+    last?: string;
   };
-  nicknames: string[];
-  birthday: Date;
-  birthdayTimezone: number;
-  lastBirthdayNotification: Date;
-  save(options?: SaveOptions): Promise<this>;
+  birthday?: Date;
+  timezone?: string;
+  nicknameAnnounce?: boolean;
+  isBot?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-const UserSchema = new Schema({
-  userId: { type: String, required: true, unique: true },
-  username: { type: String, required: true },
-  name: {
-    first: {
-      given: { type: String },
-      preferred: { type: String },
+const userSchema = new Schema<IUser>(
+  {
+    discordId: {
+      type: String,
+      required: true,
+      unique: true,
     },
-    family: { type: String },
+    username: {
+      type: String,
+      required: true,
+    },
+    name: {
+      first: {
+        type: String,
+      },
+      last: {
+        type: String,
+      },
+    },
+    birthday: {
+      type: Date,
+    },
+    timezone: {
+      type: String,
+    },
+    nicknameAnnounce: {
+      type: Boolean,
+      default: true,
+    },
+    isBot: {
+      type: Boolean,
+    },
   },
-  nicknames: [{ type: String }],
-  birthday: { type: Date },
-  birthdayTimezone: { type: Number, default: 0 }, // Default to UTC
-  lastBirthdayNotification: { type: Date }, // Track last notification to prevent duplicates
-});
+  {
+    timestamps: true,
+  },
+);
 
-const UserModel = model<IUser>('User', UserSchema);
-
-export default UserModel;
+export const User = model<IUser>('User', userSchema);

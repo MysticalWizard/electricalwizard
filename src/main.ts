@@ -1,16 +1,13 @@
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import chalk from 'chalk';
-import config from '@/config.js';
-import { dbService } from '@/services/database.js';
-import { reminderService } from '@/services/reminder.js';
+import { config } from '@/config.js';
 import { loadCommands, loadEvents } from '@/utils/loaders.js';
+import { connectDatabase } from '@/services/database.js';
 
-/**
- * The Discord client instance.
- */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
@@ -19,22 +16,11 @@ const client = new Client({
 client.commands = new Collection();
 
 async function main() {
-  try {
-    console.log(chalk.cyanBright(':: INITIALIZING BOT ::'));
-
-    await dbService.connect();
-
-    loadCommands(client);
-    loadEvents(client);
-
-    await client.login(config.bot.token);
-
-    reminderService.initialize(client);
-  } catch (error) {
-    console.error('Failed to start the bot:', error);
-    await dbService.disconnect();
-    process.exit(1);
-  }
+  console.log(chalk.bold('⚒ Initializing bot...'));
+  await connectDatabase();
+  await loadCommands(client);
+  await loadEvents(client);
+  await client.login(config.botToken);
 }
 
 main();

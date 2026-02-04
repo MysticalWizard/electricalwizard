@@ -1,4 +1,4 @@
-import {
+import type {
   AutocompleteInteraction,
   ChatInputCommandInteraction,
   ClientEvents,
@@ -9,12 +9,12 @@ export interface SlashCommand {
   data: SlashCommandBuilder;
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
   autocomplete?: (interaction: AutocompleteInteraction) => Promise<void>;
-  cooldown?: number; // in seconds
+  cooldown?: number;
   global?: boolean;
 }
 
 export interface Event<K extends keyof ClientEvents> {
   name: K;
   once?: boolean;
-  execute: (...args: ClientEvents[K]) => Promise<void> | void;
+  execute: (...args: ClientEvents[K]) => void | Promise<void>;
 }

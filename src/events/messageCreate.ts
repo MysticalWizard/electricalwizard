@@ -1,92 +1,116 @@
-import { Events, Message } from 'discord.js';
-import UserModel from '@/models/User.js';
-import { Event } from '@/types';
-import { formatAuthorName } from '@/utils/helpers.js';
-import { QuoteService } from '@/services/quote.js';
+import { Events, type Message } from 'discord.js';
+import type { Event } from '@/types.js';
+import { findNicknameMatches } from '@/services/nickname.js';
+import { addQuote } from '@/services/quote.js';
+import {
+  formatQuoteDisplay,
+  getFormattedUserName,
+} from '@/utils/formatName.js';
 
-const event: Event<Events.MessageCreate> = {
-  name: Events.MessageCreate,
-  execute: async (message: Message) => {
-    await handleMessageCommands(message);
+const QUOTE_REGEX = /^quote(?:\s+(.+))?$/i;
 
-    if (message.author.bot) return;
-
-    await handleNicknameMentions(message);
-  },
-};
-
-async function handleMessageCommands(message: Message): Promise<void> {
-  if (message.author.bot) return;
-
-  const content = message.content.toLowerCase().trim();
-
-  if (content === 'quote' && message.reference) {
-    await handleQuoteCommand(message);
-  }
-
-  if (content.startsWith('meow')) {
-    await message.reply('meow :3');
-  }
-}
-
-async function handleQuoteCommand(message: Message): Promise<void> {
+async function handleQuoteReply(
+  message: Message<true>,
+  context?: string,
+): Promise<void> {
   try {
-    const referencedMessage = await message.fetchReference();
-    const author = await formatAuthorName(
-      referencedMessage.author.id,
+    const referencedMessage = await message.channel.messages.fetch(
+      message.reference!.messageId!,
+    );
+
+    if (referencedMessage.author.bot) {
+      await message.reply({
+        content: "I can't quote bot messages.",
+        allowedMentions: { repliedUser: false },
+      });
+      return;
+    }
+
+    if (!referencedMessage.content.trim()) {
+      await message.reply({
+        content: 'That message has no text content to quote.',
+        allowedMentions: { repliedUser: false },
+      });
+      return;
+    }
+
+    const authorId = referencedMessage.author.id;
+    const year = new Date(referencedMessage.createdTimestamp).getFullYear();
+
+    const { name: authorName, hasName } = await getFormattedUserName(
+      authorId,
       referencedMessage.author.username,
     );
 
-    const result = await QuoteService.addQuote({
-      quote: referencedMessage.content,
-      author: author,
-      year: referencedMessage.createdAt.getFullYear(),
+    const quote = await addQuote({
+      guildId: message.guild.id,
+      content: referencedMessage.content,
+      authorId,
+      authorName,
+      year,
+      context,
+      addedById: message.author.id,
+      messageId: referencedMessage.id,
     });
 
-    await message.reply({ embeds: [result.embed] });
-  } catch (error) {
-    console.error('Error adding quote:', error);
+    const displayText = formatQuoteDisplay(
+      referencedMessage.content,
+      authorName,
+      year,
+      context,
+    );
+
+    let response = `Quote #${quote.quoteNumber} added: ${displayText}`;
+
+    if (!hasName) {
+      response += `\n\n*Note: ${referencedMessage.author} doesn't have a name set. An admin can set it with \`/user set\`.*`;
+    }
+
     await message.reply({
-      content:
-        'There was an error while adding the quote. Please try again later.',
+      content: response,
+      allowedMentions: { repliedUser: false },
+    });
+  } catch (error) {
+    console.error('Error adding quote from reply:', error);
+    await message.reply({
+      content: 'Failed to add quote. The message may have been deleted.',
+      allowedMentions: { repliedUser: false },
     });
   }
 }
 
-async function handleNicknameMentions(message: Message): Promise<void> {
-  // Fetch all users with nicknames
-  const users = await UserModel.find({
-    nicknames: { $exists: true, $ne: [] },
-  });
+export const event: Event<Events.MessageCreate> = {
+  name: Events.MessageCreate,
+  once: false,
+  async execute(message) {
+    // Ignore bot messages and DMs
+    if (message.author.bot || !message.guild) return;
 
-  // Create a map of nicknames to user IDs
-  const nicknameMap = new Map<string, string>();
-  users.forEach((user) => {
-    user.nicknames.forEach((nickname) => {
-      nicknameMap.set(nickname.toLowerCase(), user.userId);
+    // Check for quote reply trigger
+    if (message.reference?.messageId) {
+      const match = message.content.match(QUOTE_REGEX);
+      if (match) {
+        await handleQuoteReply(
+          message as Message<true>,
+          match[1]?.trim() || undefined,
+        );
+        return;
+      }
+    }
+
+    const matches = await findNicknameMatches(
+      message.guild.id,
+      message.content,
+    );
+
+    if (matches.length === 0) return;
+
+    // Build mention string in order of appearance
+    const mentions = matches.map((match) => `<@${match.userId}>`).join(' ');
+
+    await message.reply({
+      content: `${mentions}, someone is talking about you!`,
+      allowedMentions: { users: matches.map((m) => m.userId) },
     });
-  });
-
-  // Find all perfectly matched nicknames in the message
-  const words = message.content.split(/\s+/);
-  const mentionedNicknames = words
-    .map((word) => word.replace(/[^\w\s]/g, '').toLowerCase())
-    .filter((word) => nicknameMap.has(word));
-
-  // Mention users in the order their nicknames appeared
-  if (mentionedNicknames.length > 0) {
-    const mentionedUserIds = new Set(
-      mentionedNicknames.map((nickname) => nicknameMap.get(nickname)),
-    );
-    const mentions = Array.from(mentionedUserIds).map(
-      (userId) => `<@${userId}>`,
-    );
-
-    const mentionMessage = 'someone is talking about you!';
-    const mentionNotification = `${mentions.join(', ')}, ${mentionMessage}`;
-
-    await message.reply(mentionNotification);
-  }
-}
-
-export default event;
+  },
+};

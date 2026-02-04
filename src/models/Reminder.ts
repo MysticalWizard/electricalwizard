@@ -1,32 +1,53 @@
-import { Document, SaveOptions, Schema, model } from 'mongoose';
+import { Schema, model, type Document } from 'mongoose';
 
 export interface IReminder extends Document {
+  guildId: string;
+  channelId: string;
   userId: string;
   message: string;
-  reminderTime: Date;
-  timezone: number;
-  channelId: string;
-  guildId: string | null;
-  isPrivate: boolean;
-  isCompleted: boolean;
+  triggerAt: Date;
+  timezone?: string;
+  private: boolean;
   createdAt: Date;
-  save(options?: SaveOptions): Promise<this>;
+  updatedAt: Date;
 }
 
-const ReminderSchema = new Schema({
-  userId: { type: String, required: true },
-  message: { type: String, required: true },
-  reminderTime: { type: Date, required: true },
-  timezone: { type: Number, default: 0 },
-  channelId: { type: String, required: true },
-  guildId: { type: String, required: false },
-  isPrivate: { type: Boolean, default: false },
-  isCompleted: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now },
-});
+const reminderSchema = new Schema<IReminder>(
+  {
+    guildId: {
+      type: String,
+      required: true,
+    },
+    channelId: {
+      type: String,
+      required: true,
+    },
+    userId: {
+      type: String,
+      required: true,
+    },
+    message: {
+      type: String,
+      required: true,
+    },
+    triggerAt: {
+      type: Date,
+      required: true,
+    },
+    timezone: {
+      type: String,
+    },
+    private: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
 
-ReminderSchema.index({ reminderTime: 1, isCompleted: 1 });
+reminderSchema.index({ triggerAt: 1 });
+reminderSchema.index({ userId: 1, guildId: 1 });
 
-const ReminderModel = model<IReminder>('Reminder', ReminderSchema);
-
-export default ReminderModel;
+export const Reminder = model<IReminder>('Reminder', reminderSchema);

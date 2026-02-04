@@ -1,341 +1,216 @@
-import { EmbedBuilder } from 'discord.js';
-import { Types } from 'mongoose';
-import QuoteModel, { IQuote } from '@/models/Quote.js';
-import {
-  createErrorEmbed,
-  createSuccessEmbed,
-  createInfoEmbed,
-} from '@/utils/embeds.js';
-import { truncate, formatQuote } from '@/utils/strings.js';
+import { Counter, Quote, type IQuote } from '@/models/Quote.js';
+import { User } from '@/models/User.js';
+import { formatNameWithInitials } from '@/utils/formatName.js';
 
-export interface QuoteData {
-  quote: string;
-  author: string;
+export interface AddQuoteData {
+  guildId: string;
+  content: string;
+  authorId?: string | undefined;
+  authorName?: string | undefined;
   year: number;
-  context?: string;
-  linkId?: string;
+  context?: string | undefined;
+  addedById?: string | undefined;
+  messageId?: string | undefined;
 }
 
-export interface QuoteValidationOptions {
-  allowOverride?: boolean;
-  isAdmin?: boolean;
-  overrideId?: string;
-}
+/**
+ * Check if a duplicate quote exists (same content + author)
+ */
+export async function findDuplicateQuote(
+  guildId: string,
+  content: string,
+  authorId?: string,
+  authorName?: string,
+): Promise<IQuote | null> {
+  const normalizedContent = content.trim().toLowerCase();
 
-export interface QuoteResult {
-  success: boolean;
-  embed: EmbedBuilder;
-  quoteId?: string;
-}
+  const query: Record<string, unknown> = {
+    guildId,
+  };
 
-export class QuoteService {
-  static async addQuote(
-    data: QuoteData,
-    options: QuoteValidationOptions = {},
-  ): Promise<QuoteResult> {
-    try {
-      const { quote, author, year, context, linkId } = data;
-      const { allowOverride, isAdmin, overrideId } = options;
-
-      // Handle quote override
-      if (overrideId && allowOverride) {
-        if (!isAdmin) {
-          return {
-            success: false,
-            embed: createErrorEmbed(
-              '❌ Permission Denied',
-              'You need administrator permissions to override quotes.',
-            ),
-          };
-        }
-
-        const existingQuote = await QuoteModel.findById(overrideId);
-        if (!existingQuote) {
-          return {
-            success: false,
-            embed: createErrorEmbed(
-              '❌ Quote Not Found',
-              'The quote you are trying to override does not exist.',
-            ),
-          };
-        }
-
-        // Update existing quote
-        existingQuote.quote = quote;
-        existingQuote.author = author;
-        existingQuote.year = year;
-        if (context) existingQuote.context = context;
-        if (linkId) existingQuote.link = new Types.ObjectId(linkId);
-
-        await existingQuote.save();
-
-        const formattedQuote = formatQuote(quote, author, year, context);
-
-        const embed = createSuccessEmbed(`✨ Quote #${overrideId} Updated!`)
-          .addFields({
-            name: 'Formatted Quote',
-            value: formattedQuote,
-            inline: false,
-          })
-          .setTimestamp();
-
-        return {
-          success: true,
-          embed,
-          quoteId: overrideId,
-        };
-      }
-
-      // Validate link if provided
-      if (linkId) {
-        const linkValidation = await this.validateQuoteLink(linkId);
-        if (!linkValidation.success) {
-          return linkValidation;
-        }
-      }
-
-      // Create new quote
-      const newQuote = new QuoteModel({
-        quote,
-        author,
-        year,
-        context,
-        link: linkId ? new Types.ObjectId(linkId) : undefined,
-      });
-
-      await newQuote.save();
-
-      const quoteCount = await QuoteModel.countDocuments();
-      const formattedQuote = formatQuote(quote, author, year, context);
-
-      const embed = createInfoEmbed(`✅ Quote #${quoteCount} Added!`)
-        .addFields({
-          name: 'Formatted Quote',
-          value: formattedQuote,
-          inline: false,
-        })
-        .setTimestamp();
-
-      if (linkId) {
-        const linkedQuote = await QuoteModel.findById(linkId);
-        if (linkedQuote) {
-          const truncatedQuote = truncate(linkedQuote.quote, 50);
-          embed.addFields({
-            name: '🔗 Linked Quote',
-            value: `"${truncatedQuote}" (#${linkedQuote._id})`,
-            inline: false,
-          });
-        }
-      }
-
-      return {
-        success: true,
-        embed,
-        quoteId: newQuote._id.toString(),
-      };
-    } catch (error) {
-      console.error('Error adding or updating quote:', error);
-
-      return {
-        success: false,
-        embed: createErrorEmbed(
-          '❌ Database Error',
-          'There was an error while adding or updating the quote. Please try again later.',
-        ).setTimestamp(),
-      };
-    }
-  }
-
-  private static async validateQuoteLink(linkId: string): Promise<QuoteResult> {
-    // Check for double links
-    const existingLink = await QuoteModel.findOne({ link: linkId });
-    if (existingLink) {
-      return {
-        success: false,
-        embed: createErrorEmbed(
-          '❌ Double Link Error',
-          'This quote is already linked to another quote.',
-        ),
-      };
-    }
-
-    // Check for circular links and maximum chain length
-    const chainLength = await this.checkCircularAndChainLength(linkId);
-    if (chainLength === -1) {
-      return {
-        success: false,
-        embed: createErrorEmbed(
-          '❌ Circular Link Error',
-          'Circular link detected. This would create an infinite loop.',
-        ),
-      };
-    }
-
-    if (chainLength >= 5) {
-      return {
-        success: false,
-        embed: createErrorEmbed(
-          '❌ Chain Length Error',
-          'Maximum chain length (5) reached. Cannot link more quotes in this chain.',
-        ),
-      };
-    }
-
-    return {
-      success: true,
-      embed: createInfoEmbed(''), // Unused for success case
+  if (authorId) {
+    query.authorId = authorId;
+  } else if (authorName) {
+    query.authorName = {
+      $regex: new RegExp(
+        `^${authorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+        'i',
+      ),
     };
   }
 
-  private static async checkCircularAndChainLength(
-    quoteId: string,
-  ): Promise<number> {
-    const result = await QuoteModel.aggregate([
-      { $match: { _id: new Types.ObjectId(quoteId) } },
-      {
-        $graphLookup: {
-          from: 'quotes',
-          startWith: '$link',
-          connectFromField: 'link',
-          connectToField: '_id',
-          as: 'chain',
-          maxDepth: 10,
-          depthField: 'depth',
-        },
-      },
-      {
-        $project: {
-          chainLength: { $add: [{ $size: '$chain' }, 1] },
-          hasCircular: {
-            $gt: [{ $size: { $setIntersection: [['$_id'], '$chain._id'] } }, 0],
-          },
-        },
-      },
-    ]);
+  const quotes = await Quote.find(query).lean();
 
-    if (result.length === 0) return 1;
+  return (
+    quotes.find((q) => q.content.trim().toLowerCase() === normalizedContent) ??
+    null
+  );
+}
 
-    const { chainLength, hasCircular } = result[0];
-    return hasCircular ? -1 : chainLength;
+/**
+ * Add a new quote to a guild
+ */
+export async function addQuote(data: AddQuoteData): Promise<IQuote> {
+  const quote = new Quote({
+    guildId: data.guildId,
+    content: data.content,
+    year: data.year,
+    authorId: data.authorId,
+    authorName: data.authorName,
+    context: data.context,
+    addedById: data.addedById,
+    messageId: data.messageId,
+  });
+
+  return quote.save();
+}
+
+/**
+ * Get a specific quote by number
+ */
+export async function getQuoteByNumber(
+  guildId: string,
+  quoteNumber: number,
+): Promise<IQuote | null> {
+  return Quote.findOne({ guildId, quoteNumber }).lean();
+}
+
+/**
+ * Get random quotes from a guild
+ */
+export async function getRandomQuotes(
+  guildId: string,
+  count: number = 1,
+): Promise<IQuote[]> {
+  return Quote.aggregate([
+    { $match: { guildId } },
+    { $sample: { size: count } },
+  ]);
+}
+
+/**
+ * Get quotes filtered by author
+ */
+export async function getQuotesByAuthor(
+  guildId: string,
+  authorId: string,
+  count: number = 1,
+): Promise<IQuote[]> {
+  return Quote.aggregate([
+    { $match: { guildId, authorId } },
+    { $sample: { size: count } },
+  ]);
+}
+
+/**
+ * Get quotes filtered by year
+ */
+export async function getQuotesByYear(
+  guildId: string,
+  year: number,
+  count: number = 1,
+): Promise<IQuote[]> {
+  return Quote.aggregate([
+    { $match: { guildId, year } },
+    { $sample: { size: count } },
+  ]);
+}
+
+/**
+ * Get quotes filtered by both author and year
+ */
+export async function getQuotesByAuthorAndYear(
+  guildId: string,
+  authorId: string,
+  year: number,
+  count: number = 1,
+): Promise<IQuote[]> {
+  return Quote.aggregate([
+    { $match: { guildId, authorId, year } },
+    { $sample: { size: count } },
+  ]);
+}
+
+export interface DeleteQuoteResult {
+  deleted: boolean;
+  slotsFreed: number;
+}
+
+/**
+ * Delete a quote by number
+ * Frees up trailing IDs if there are gaps at the end
+ */
+export async function deleteQuote(
+  guildId: string,
+  quoteNumber: number,
+): Promise<DeleteQuoteResult> {
+  const result = await Quote.deleteOne({ guildId, quoteNumber });
+
+  if (result.deletedCount > 0) {
+    const counter = await Counter.findById(`quote_${guildId}`);
+    const oldSeq = counter?.seq ?? 0;
+
+    const highestQuote = await Quote.findOne({ guildId })
+      .sort({ quoteNumber: -1 })
+      .select('quoteNumber')
+      .lean();
+
+    const newSeq = highestQuote?.quoteNumber ?? 0;
+    await Counter.findByIdAndUpdate(`quote_${guildId}`, { seq: newSeq });
+
+    return { deleted: true, slotsFreed: oldSeq - newSeq };
   }
 
-  static async getAutocompleteChoices(type: 'author' | 'quote', limit = 5) {
-    if (type === 'author') {
-      const popularAuthors = await QuoteModel.aggregate([
-        { $group: { _id: '$author', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: limit },
-        { $project: { _id: 0, author: '$_id' } },
-      ]);
+  return { deleted: false, slotsFreed: 0 };
+}
 
-      const recentAuthor = await QuoteModel.findOne()
-        .sort({ _id: -1 })
-        .select('author');
+/**
+ * Check if a user can delete a quote
+ * Returns true if user is the author, adder, or server admin
+ */
+export function canDeleteQuote(
+  quote: IQuote,
+  userId: string,
+  isAdmin: boolean,
+): boolean {
+  return isAdmin || quote.authorId === userId || quote.addedById === userId;
+}
 
-      return [
-        ...new Set([
-          ...popularAuthors.map((a) => a.author),
-          recentAuthor ? recentAuthor.author : '',
-        ]),
-      ].filter(Boolean);
-    } else {
-      const recentQuotes = await QuoteModel.find()
-        .sort({ _id: -1 })
-        .limit(limit)
-        .lean();
-
-      return recentQuotes.map((quote) => ({
-        name: truncate(quote.quote, 50),
-        value: quote._id.toString(),
-      }));
-    }
-  }
-
-  /**
-   * Get all quotes in a chain (both linked and linking quotes)
-   * Uses aggregation pipeline for better performance
-   */
-  static async getQuoteChain(quote: IQuote): Promise<IQuote[]> {
-    const result = await QuoteModel.aggregate([
-      { $match: { _id: quote._id } },
+/**
+ * Get users with names set for autocomplete
+ */
+export async function getUsersWithNames(): Promise<
+  Array<{ discordId: string; displayName: string }>
+> {
+  const users = await User.find({
+    $or: [
       {
-        $graphLookup: {
-          from: 'quotes',
-          startWith: '$_id',
-          connectFromField: 'link',
-          connectToField: '_id',
-          as: 'linkedQuotes',
-          maxDepth: 10,
-          depthField: 'depth',
-        },
+        'name.first': { $exists: true },
+        $and: [{ 'name.first': { $ne: null } }, { 'name.first': { $ne: '' } }],
       },
       {
-        $graphLookup: {
-          from: 'quotes',
-          startWith: '$_id',
-          connectFromField: '_id',
-          connectToField: 'link',
-          as: 'linkingQuotes',
-          maxDepth: 10,
-          depthField: 'depth',
-        },
+        'name.last': { $exists: true },
+        $and: [{ 'name.last': { $ne: null } }, { 'name.last': { $ne: '' } }],
       },
-      {
-        $project: {
-          allQuotes: {
-            $concatArrays: [
-              [
-                {
-                  _id: '$_id',
-                  quote: '$quote',
-                  author: '$author',
-                  year: '$year',
-                  context: '$context',
-                  link: '$link',
-                },
-              ],
-              '$linkedQuotes',
-              '$linkingQuotes',
-            ],
-          },
-        },
-      },
-      { $unwind: '$allQuotes' },
-      { $replaceRoot: { newRoot: '$allQuotes' } },
-      {
-        $group: {
-          _id: '$_id',
-          quote: { $first: '$quote' },
-          author: { $first: '$author' },
-          year: { $first: '$year' },
-          context: { $first: '$context' },
-          link: { $first: '$link' },
-        },
-      },
-    ]);
+    ],
+  }).lean();
 
-    return result;
-  }
+  return users.map((user) => ({
+    discordId: user.discordId,
+    displayName: formatNameWithInitials(user.name?.first, user.name?.last),
+  }));
+}
 
-  /**
-   * Get author autocomplete suggestions filtered by value
-   */
-  static async getAuthorAutocomplete(
-    focusedValue: string,
-  ): Promise<Array<{ name: string; value: string }>> {
-    const choices = await this.getAutocompleteChoices('author');
-    const filtered = choices.filter((choice) =>
-      choice.toLowerCase().startsWith(focusedValue.toLowerCase()),
-    );
-    return filtered.map((choice) => ({ name: choice, value: choice }));
-  }
-
-  /**
-   * Get quote autocomplete suggestions
-   */
-  static async getQuoteAutocomplete(
-    count: number,
-  ): Promise<Array<{ name: string; value: string }>> {
-    return await this.getAutocompleteChoices('quote', count);
-  }
+/**
+ * Get quote authors for autocomplete (users who have quotes)
+ */
+export async function getQuoteAuthors(
+  guildId: string,
+): Promise<Array<{ authorId: string; count: number }>> {
+  return Quote.aggregate([
+    { $match: { guildId, authorId: { $exists: true, $ne: null } } },
+    { $group: { _id: '$authorId', count: { $sum: 1 } } },
+    { $project: { authorId: '$_id', count: 1, _id: 0 } },
+    { $sort: { count: -1 } },
+  ]);
 }

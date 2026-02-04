@@ -1,41 +1,41 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc.js';
-import timezone from 'dayjs/plugin/timezone.js';
-import duration from 'dayjs/plugin/duration.js';
-import relativeTime from 'dayjs/plugin/relativeTime.js';
-import ReminderModel from '@/models/Reminder.js';
-import { SlashCommand } from '@/types';
+import {
+  SlashCommandBuilder,
+  type AutocompleteInteraction,
+  type ChatInputCommandInteraction,
+} from 'discord.js';
+import type { SlashCommand } from '@/types.js';
+import { colors, createEmbed } from '@/utils/embeds.js';
+import {
+  getSupportedTimezones,
+  validateTimezone,
+  resolveTimezone,
+} from '@/utils/timezone.js';
+import { truncate } from '@/utils/formatName.js';
+import { requireGuild } from '@/utils/guards.js';
+import { respondTimezoneAutocomplete } from '@/utils/autocomplete.js';
+import {
+  parseTimeInput,
+  formatDuration,
+  formatDateInTimezone,
+} from '@/utils/parseTime.js';
+import {
+  createReminder,
+  getUserReminders,
+  cancelReminder,
+  getUsedTimezones,
+  getRemindersForAutocomplete,
+} from '@/services/reminder.js';
 
-dayjs.extend(utc);
-dayjs.extend(timezone);
-dayjs.extend(duration);
-dayjs.extend(relativeTime);
+const allTimezones = getSupportedTimezones();
 
-const timezoneChoices = Array.from({ length: 25 }, (_, i) => {
-  const offset = i - 12;
-  const sign = offset >= 0 ? '+' : '-';
-  const absOffset = Math.abs(offset);
-  const label = `UTC${sign}${absOffset.toString().padStart(2, '0')}:00`;
-  return { name: label, value: offset.toString() };
-});
-
-const command: SlashCommand = {
+export const command: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('remind')
-    .setDescription('Set a personal reminder')
+    .setDescription('Set and manage reminders')
     .addSubcommand((subcommand) =>
       subcommand
-        .setName('set')
-        .setDescription('Set a new reminder')
-        .addStringOption((option) =>
-          option
-            .setName('time')
-            .setDescription(
-              'When to remind you (e.g., "2h", "30m", "1d", "2025-12-25 15:30")',
-            )
-            .setRequired(true),
-        )
+        .setName('new')
+        .setDescription('Create a new reminder')
         .addStringOption((option) =>
           option
             .setName('message')
@@ -44,15 +44,24 @@ const command: SlashCommand = {
         )
         .addStringOption((option) =>
           option
+            .setName('time')
+            .setDescription(
+              'When to remind you (e.g., 1h, 30m, 2d, 2026-03-29)',
+            )
+            .setRequired(true),
+        )
+        .addStringOption((option) =>
+          option
             .setName('timezone')
-            .setDescription('Your timezone for the reminder')
-            .addChoices(...timezoneChoices),
+            .setDescription(
+              'Timezone for the reminder (defaults to your saved timezone)',
+            )
+            .setAutocomplete(true),
         )
         .addBooleanOption((option) =>
           option
             .setName('private')
-            .setDescription('Send reminder as a DM instead of in the channel')
-            .setRequired(false),
+            .setDescription('Send reminder as a DM instead of in channel'),
         ),
     )
     .addSubcommand((subcommand) =>
@@ -64,228 +73,188 @@ const command: SlashCommand = {
         .setDescription('Cancel a reminder')
         .addStringOption((option) =>
           option
-            .setName('reminder_id')
-            .setDescription('ID of the reminder to cancel')
-            .setRequired(true),
+            .setName('reminder')
+            .setDescription('The reminder to cancel')
+            .setRequired(true)
+            .setAutocomplete(true),
         ),
     ) as SlashCommandBuilder,
-  global: true,
-  cooldown: 5,
 
-  execute: async (interaction: ChatInputCommandInteraction) => {
+  async execute(interaction: ChatInputCommandInteraction) {
+    if (!(await requireGuild(interaction))) return;
+
     const subcommand = interaction.options.getSubcommand();
 
     switch (subcommand) {
-      case 'set':
-        await handleSetReminder(interaction);
+      case 'new':
+        await handleNew(interaction);
         break;
       case 'list':
-        await handleListReminders(interaction);
+        await handleList(interaction);
         break;
       case 'cancel':
-        await handleCancelReminder(interaction);
+        await handleCancel(interaction);
         break;
+    }
+  },
+
+  async autocomplete(interaction: AutocompleteInteraction) {
+    if (!interaction.guild) return;
+
+    const focused = interaction.options.getFocused(true);
+
+    if (focused.name === 'timezone') {
+      const usedTimezones = await getUsedTimezones();
+      await respondTimezoneAutocomplete(
+        interaction,
+        allTimezones,
+        usedTimezones,
+      );
+    } else if (focused.name === 'reminder') {
+      await handleReminderAutocomplete(interaction, focused.value);
     }
   },
 };
 
-async function handleSetReminder(interaction: ChatInputCommandInteraction) {
-  const timeInput = interaction.options.getString('time', true);
+async function handleNew(
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
   const message = interaction.options.getString('message', true);
-  const timezoneOffset = parseInt(
-    interaction.options.getString('timezone') || '0',
-  );
-  const isPrivate = interaction.options.getBoolean('private') || false;
+  const timeInput = interaction.options.getString('time', true);
+  const timezoneInput = interaction.options.getString('timezone');
+  const isPrivate = interaction.options.getBoolean('private') ?? false;
 
-  let reminderTime: dayjs.Dayjs;
+  const timezone = await resolveTimezone(interaction.user.id, timezoneInput);
+  if (!(await validateTimezone(interaction, timezone))) return;
 
-  try {
-    reminderTime = parseTimeInput(timeInput, timezoneOffset);
-  } catch {
+  // Parse the time input
+  const parsed = parseTimeInput(timeInput, timezone);
+  if (!parsed) {
     await interaction.reply({
       content:
-        'Invalid time format. Use formats like "2h", "30m", "1d", or "2025-12-25 15:30".',
+        'Invalid time format. Examples:\n' +
+        '- Relative: `1h`, `30m`, `2d`, `1h30m`, `13hr 43m`\n' +
+        '- Absolute: `2026-03-29`, `2026-03-29 14:30`',
       ephemeral: true,
     });
     return;
   }
 
-  if (reminderTime.isBefore(dayjs())) {
+  // Check if the time is in the past
+  if (parsed.date <= new Date()) {
     await interaction.reply({
-      content: 'Reminder time must be in the future.',
+      content: 'The reminder time must be in the future.',
       ephemeral: true,
     });
     return;
   }
 
-  try {
-    const reminder = new ReminderModel({
-      userId: interaction.user.id,
-      message,
-      reminderTime: reminderTime.toDate(),
-      timezone: timezoneOffset,
-      channelId: interaction.channelId,
-      guildId: interaction.guildId,
-      isPrivate,
-    });
+  // Create the reminder
+  const reminder = await createReminder({
+    guildId: interaction.guild!.id,
+    channelId: interaction.channelId,
+    userId: interaction.user.id,
+    message,
+    triggerAt: parsed.date,
+    ...(timezone && { timezone }),
+    private: isPrivate,
+  });
 
-    await reminder.save();
+  const timestamp = Math.floor(parsed.date.getTime() / 1000);
 
-    const timezoneString = `UTC${timezoneOffset >= 0 ? '+' : ''}${timezoneOffset}:00`;
-    const formattedTime = reminderTime.format('MMMM D, YYYY [at] h:mm A');
-    const deliveryMethod = isPrivate ? 'via DM' : 'in this channel';
-
-    await interaction.reply({
-      content: `Reminder set! I'll remind you "${message}" on ${formattedTime} (${timezoneString}) ${deliveryMethod}.`,
-      ephemeral: true,
-    });
-  } catch (error) {
-    console.error('Error setting reminder:', error);
-    await interaction.reply({
-      content: 'Failed to set reminder. Please try again.',
-      ephemeral: true,
-    });
-  }
-}
-
-async function handleListReminders(interaction: ChatInputCommandInteraction) {
-  try {
-    const reminders = await ReminderModel.find({
-      userId: interaction.user.id,
-      isCompleted: false,
-      reminderTime: { $gte: new Date() },
-    })
-      .sort({ reminderTime: 1 })
-      .limit(10);
-
-    if (reminders.length === 0) {
-      await interaction.reply({
-        content: 'You have no active reminders.',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    const reminderList = reminders
-      .map((reminder) => {
-        const time = dayjs(reminder.reminderTime).utcOffset(
-          reminder.timezone * 60,
-        );
-        const timezoneString = `UTC${reminder.timezone >= 0 ? '+' : ''}${reminder.timezone}:00`;
-        const deliveryIcon = reminder.isPrivate ? '🔒' : '💬';
-        const deliveryText = reminder.isPrivate ? ' (DM)' : ' (Channel)';
-        return `**${reminder._id}:** "${reminder.message}"\n📅 ${time.format('MMMM D, YYYY [at] h:mm A')} (${timezoneString}) ${deliveryIcon}${deliveryText}`;
-      })
-      .join('\n\n');
-
-    await interaction.reply({
-      content: `**Your Active Reminders:**\n\n${reminderList}`,
-      ephemeral: true,
-    });
-  } catch (error) {
-    console.error('Error listing reminders:', error);
-    await interaction.reply({
-      content: 'Failed to retrieve reminders. Please try again.',
-      ephemeral: true,
-    });
-  }
-}
-
-async function handleCancelReminder(interaction: ChatInputCommandInteraction) {
-  const reminderId = interaction.options.getString('reminder_id', true);
-
-  try {
-    const reminder = await ReminderModel.findOneAndUpdate(
+  const embed = createEmbed()
+    .setTitle('Reminder Set')
+    .setColor(colors.success)
+    .setDescription(`I'll remind you: **${message}**`)
+    .addFields(
+      { name: 'When', value: `<t:${timestamp}:f>`, inline: true },
+      { name: 'In', value: `<t:${timestamp}:R>`, inline: true },
       {
-        _id: reminderId,
-        userId: interaction.user.id,
-        isCompleted: false,
+        name: 'Private',
+        value: isPrivate ? 'Yes (DM)' : 'No (Channel)',
+        inline: true,
       },
-      { isCompleted: true },
-      { new: true },
-    );
+    )
+    .setFooter({ text: `ID: ${reminder._id}` });
 
-    if (!reminder) {
-      await interaction.reply({
-        content: 'Reminder not found or already completed.',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    await interaction.reply({
-      content: `Reminder "${reminder.message}" has been cancelled.`,
-      ephemeral: true,
-    });
-  } catch (error) {
-    console.error('Error cancelling reminder:', error);
-    await interaction.reply({
-      content: 'Failed to cancel reminder. Please try again.',
-      ephemeral: true,
-    });
-  }
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-function parseTimeInput(
-  timeInput: string,
-  timezoneOffset: number,
-): dayjs.Dayjs {
-  const now = dayjs().utcOffset(timezoneOffset * 60);
+async function handleList(
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
+  const reminders = await getUserReminders(
+    interaction.guild!.id,
+    interaction.user.id,
+  );
 
-  // Check for relative time format (e.g., "2h", "30m", "1d")
-  const relativeMatch = timeInput.match(/^(\d+)([smhdw])$/i);
-  if (relativeMatch) {
-    const amount = parseInt(relativeMatch[1]);
-    const unit = relativeMatch[2].toLowerCase();
-
-    switch (unit) {
-      case 's':
-        return now.add(amount, 'second');
-      case 'm':
-        return now.add(amount, 'minute');
-      case 'h':
-        return now.add(amount, 'hour');
-      case 'd':
-        return now.add(amount, 'day');
-      case 'w':
-        return now.add(amount, 'week');
-      default:
-        throw new Error('Invalid time unit');
-    }
+  if (reminders.length === 0) {
+    await interaction.reply({
+      content: 'You have no active reminders.',
+      ephemeral: true,
+    });
+    return;
   }
 
-  // Check for absolute time format (e.g., "2025-12-25 15:30", "Dec 25 3:30 PM")
-  const absoluteTime = dayjs(timeInput).utcOffset(timezoneOffset * 60);
-  if (absoluteTime.isValid()) {
-    return absoluteTime;
-  }
-
-  // Try parsing with different formats
-  const formats = [
-    'YYYY-MM-DD HH:mm',
-    'YYYY-MM-DD h:mm A',
-    'MM-DD HH:mm',
-    'MM-DD h:mm A',
-    'MMM D HH:mm',
-    'MMM D h:mm A',
-    'MMMM D HH:mm',
-    'MMMM D h:mm A',
-  ];
-
-  for (const format of formats) {
-    const parsed = dayjs(timeInput, format, true).utcOffset(
-      timezoneOffset * 60,
+  const embed = createEmbed()
+    .setTitle('Your Reminders')
+    .setDescription(
+      reminders
+        .map((r, i) => {
+          const timeUntil = formatDuration(
+            new Date(r.triggerAt).getTime() - Date.now(),
+          );
+          const formattedTime = formatDateInTimezone(r.triggerAt, r.timezone);
+          const privateTag = r.private ? ' 🔒' : '';
+          return `**${i + 1}.** ${r.message}${privateTag}\n   ⏰ ${formattedTime} (in ${timeUntil})\n   ID: \`${r._id}\``;
+        })
+        .join('\n\n'),
     );
-    if (parsed.isValid()) {
-      // If no year specified, assume current year
-      if (!format.includes('YYYY')) {
-        return parsed.year(now.year());
-      }
-      return parsed;
-    }
-  }
 
-  throw new Error('Unable to parse time input');
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-export default command;
+async function handleCancel(
+  interaction: ChatInputCommandInteraction,
+): Promise<void> {
+  const reminderId = interaction.options.getString('reminder', true);
+
+  const cancelled = await cancelReminder(reminderId, interaction.user.id);
+
+  if (!cancelled) {
+    await interaction.reply({
+      content: 'Reminder not found or you do not have permission to cancel it.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const embed = createEmbed()
+    .setTitle('Reminder Cancelled')
+    .setColor(colors.success)
+    .setDescription('Your reminder has been cancelled.');
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
+async function handleReminderAutocomplete(
+  interaction: AutocompleteInteraction,
+  value: string,
+): Promise<void> {
+  const reminders = await getRemindersForAutocomplete(
+    interaction.guild!.id,
+    interaction.user.id,
+    value || undefined,
+  );
+
+  await interaction.respond(
+    reminders.map((r) => {
+      const timeUntil = formatDuration(r.triggerAt.getTime() - Date.now());
+      const label = `${truncate(r.message, 50)} (in ${timeUntil})`;
+      return {
+        name: label.slice(0, 100),
+        value: r.id,
+      };
+    }),
+  );
+}

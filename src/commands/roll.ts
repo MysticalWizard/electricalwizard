@@ -1,24 +1,22 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
-import { SlashCommand } from '@/types';
+import { SlashCommandBuilder } from 'discord.js';
+import type { ChatInputCommandInteraction } from 'discord.js';
+import type { SlashCommand } from '@/types.js';
 
-const command: SlashCommand = {
+export const command: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('roll')
-    .setDescription('Roll a random number.')
+    .setDescription('Rolls a random number in a specified range')
     .addIntegerOption((option) =>
       option
-        .setName('n')
-        .setDescription('Maximum number to roll. Default is 100.')
+        .setName('max')
+        .setDescription('Maximum number (default: 100)')
         .setMinValue(1)
         .setMaxValue(1000000),
     ) as SlashCommandBuilder,
   global: true,
-  execute: async (interaction: ChatInputCommandInteraction) => {
-    const user = interaction.user;
-    const max = interaction.options.getInteger('n') || 100;
+  async execute(interaction: ChatInputCommandInteraction) {
+    const max = interaction.options.getInteger('max') ?? 100;
     const roll = Math.floor(Math.random() * max) + 1;
-    await interaction.reply(`${user} rolled ${roll}.`);
+    await interaction.reply(`${interaction.user} rolled ${roll}.`);
   },
 };
-
-export default command;

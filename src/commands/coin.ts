@@ -1,15 +1,14 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
-import { SlashCommand } from '@/types';
+import { SlashCommandBuilder } from 'discord.js';
+import type { ChatInputCommandInteraction } from 'discord.js';
+import type { SlashCommand } from '@/types.js';
 
-const command: SlashCommand = {
+export const command: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('coin')
-    .setDescription('Flips a coin.'),
+    .setDescription('Flips a coin'),
   global: true,
-  execute: async (interaction: ChatInputCommandInteraction) => {
+  async execute(interaction: ChatInputCommandInteraction) {
     const result = Math.random() < 0.5 ? 'Heads' : 'Tails';
     await interaction.reply(`The coin landed on **${result}**!`);
   },
 };
-
-export default command;

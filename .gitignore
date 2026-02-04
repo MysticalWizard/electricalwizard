@@ -1,32 +1,51 @@
 # dependencies
-/node_modules
-/.pnp
-.pnp.js
-.yarn/install-state.gz
+node_modules/
 
-# compiled output
-/build
-/dist
-/out
-
-# AI notes
-CLAUDE.md
-
-# local env files
+# environment variables
 .env
 .env.*
-!.env*.example
+!.env.example
 config.json
 
+# compiled output
+/dist/
+/build/
+/out/
+
+# test coverage
+coverage/
+
+# caches
+.cache/
+.eslintcache
+
+# typescript
+*.tsbuildinfo
+
 # logs
-logs
+logs/
 *.log
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# runtime
+pids/
+*.pid
+*.seed
+
+# ide
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# vim
+*.sw?
+.vimrc
+
 # misc
 .DS_Store
-.idea
 *.pem
 Thumbs.db

@@ -1,21 +1,32 @@
-import { Document, Schema, model } from 'mongoose';
+import { Schema, model, type Document } from 'mongoose';
 
 export interface IGuild extends Document {
   guildId: string;
-  prefix: string;
-  botChannelId: string | null;
-  welcomeChannelId: string | null;
-  birthdayChannelId: string | null;
+  name: string;
+  nicknameAnnounce?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-const GuildSchema = new Schema({
-  guildId: { required: true, type: String },
-  prefix: { type: String, default: process.env.PREFIX },
-  botChannelId: { type: String, default: null },
-  welcomeChannelId: { type: String, default: null },
-  birthdayChannelId: { type: String, default: null },
-});
+const guildSchema = new Schema<IGuild>(
+  {
+    guildId: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    nicknameAnnounce: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
 
-const GuildModel = model<IGuild>('Guild', GuildSchema);
-
-export default GuildModel;
+export const Guild = model<IGuild>('Guild', guildSchema);

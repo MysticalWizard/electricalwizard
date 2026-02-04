@@ -1,57 +1,63 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
-import { SlashCommand } from '@/types';
+import { SlashCommandBuilder } from 'discord.js';
+import type { ChatInputCommandInteraction } from 'discord.js';
+import type { SlashCommand } from '@/types.js';
 
-const command: SlashCommand = {
+function shuffle<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  return shuffled;
+}
+
+export const command: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('team')
-    .setDescription('team scrambler - requested by eddie')
+    .setDescription('Generate randomized teams')
     .addStringOption((option) =>
       option
         .setName('players')
-        .setDescription('comma separated list of players.')
+        .setDescription('Comma-separated list of players')
         .setRequired(true),
     )
     .addIntegerOption((option) =>
       option
         .setName('teams')
-        .setDescription('number of teams to create.')
+        .setDescription('Number of teams (2-16)')
         .setRequired(true)
         .setMinValue(2)
-        .setMaxValue(8),
+        .setMaxValue(16),
     ) as SlashCommandBuilder,
   global: true,
-  execute: async (interaction: ChatInputCommandInteraction) => {
-    await interaction.deferReply();
+  async execute(interaction: ChatInputCommandInteraction) {
+    const playersInput = interaction.options.getString('players', true);
+    const teamCount = interaction.options.getInteger('teams', true);
 
-    const playersOption = interaction.options.getString('players');
-    const teamsCountOption = interaction.options.getInteger('teams');
+    const players = playersInput
+      .split(',')
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
 
-    if (!playersOption || !teamsCountOption) {
-      await interaction.editReply('Invalid options provided.');
+    if (players.length < teamCount) {
+      await interaction.reply({
+        content: `Not enough players (${players.length}) for ${teamCount} teams.`,
+        ephemeral: true,
+      });
       return;
     }
 
-    const players = playersOption.split(',').map((player) => player.trim());
-    const teamsCount = teamsCountOption;
+    const shuffled = shuffle(players);
+    const teams: string[][] = Array.from({ length: teamCount }, () => []);
 
-    // Fisher-Yates Shuffle
-    for (let i = players.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [players[i], players[j]] = [players[j], players[i]];
-    }
-
-    // Distribute players into teams
-    const teams: string[][] = Array.from({ length: teamsCount }, () => []);
-    players.forEach((player, index) => {
-      teams[index % teamsCount].push(player);
+    shuffled.forEach((player, index) => {
+      teams[index % teamCount]!.push(player);
     });
 
-    // Generate the reply message
-    const reply = teams
-      .map((team, index) => `Team ${index + 1}: ${team.join(', ')}`)
+    const result = teams
+      .map((team, i) => `**Team ${i + 1}:** ${team.join(', ')}`)
       .join('\n');
-    await interaction.editReply(reply);
+
+    await interaction.reply(result);
   },
 };
-
-export default command;

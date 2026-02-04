@@ -1,71 +1,133 @@
 import {
-  ActivityType,
-  ChatInputCommandInteraction,
-  PermissionFlagsBits,
   SlashCommandBuilder,
+  PermissionFlagsBits,
+  type ChatInputCommandInteraction,
 } from 'discord.js';
-import StatusModel from '@/models/Status.js';
-import { SlashCommand } from '@/types';
-import { isOwnerOrAdmin, replyPermissionDenied } from '@/utils/permissions.js';
-import { UserService } from '@/services/user.js';
+import type { SlashCommand } from '@/types.js';
+import { Bot } from '@/models/Bot.js';
+import { BotStatus, BotActivityType } from '@/enums.js';
+import { config } from '@/config.js';
+import { colors, createEmbed } from '@/utils/embeds.js';
 
-const command: SlashCommand = {
+export const command: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('status')
-    .setDescription("Change the bot's status message")
+    .setDescription("Manage the bot's status")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((option) =>
+      option
+        .setName('state')
+        .setDescription('The presence state of the bot')
+        .addChoices(
+          { name: 'Online', value: BotStatus.Online },
+          { name: 'Idle', value: BotStatus.Idle },
+          { name: 'Do Not Disturb', value: BotStatus.DoNotDisturb },
+          { name: 'Invisible', value: BotStatus.Invisible },
+        ),
+    )
+    .addStringOption((option) =>
+      option
+        .setName('activity')
+        .setDescription('The activity type')
+        .addChoices(
+          { name: 'None', value: 'none' },
+          { name: 'Playing', value: String(BotActivityType.Playing) },
+          { name: 'Streaming', value: String(BotActivityType.Streaming) },
+          { name: 'Listening', value: String(BotActivityType.Listening) },
+          { name: 'Watching', value: String(BotActivityType.Watching) },
+          { name: 'Competing', value: String(BotActivityType.Competing) },
+        ),
+    )
     .addStringOption((option) =>
       option
         .setName('message')
-        .setDescription('The new status message')
-        .setRequired(true),
-    )
-    .setDefaultMemberPermissions(
-      PermissionFlagsBits.Administrator,
+        .setDescription('The status message')
+        .setMaxLength(128),
     ) as SlashCommandBuilder,
 
-  execute: async (interaction: ChatInputCommandInteraction) => {
-    if (!interaction.isChatInputCommand()) return;
+  async execute(interaction: ChatInputCommandInteraction) {
+    const state = interaction.options.getString('state');
+    const activity = interaction.options.getString('activity');
+    const message = interaction.options.getString('message');
 
-    // Check if user is bot owner or has administrator permissions
-    if (!isOwnerOrAdmin(interaction)) {
-      await replyPermissionDenied(
-        interaction,
-        'You need Administrator permissions or be the bot owner to change the status.',
-      );
+    if (!state && !activity && message === null) {
+      const botConfig = await Bot.findOne({ clientId: config.clientId });
+
+      const embed = createEmbed()
+        .setTitle('Bot Status')
+        .setColor(colors.primary)
+        .addFields(
+          { name: 'State', value: botConfig?.status ?? 'online', inline: true },
+          {
+            name: 'Activity',
+            value: getActivityName(botConfig?.activityType ?? null),
+            inline: true,
+          },
+          {
+            name: 'Message',
+            value: botConfig?.activityName || 'None',
+            inline: true,
+          },
+        );
+
+      await interaction.reply({ embeds: [embed] });
       return;
     }
 
-    const newStatus = interaction.options.getString('message', true);
+    const update: Record<string, unknown> = {};
 
-    try {
-      // Find or create the user using UserService
-      const user = await UserService.findOrCreateUser(
-        interaction.user.id,
-        interaction.user.username,
-      );
-
-      // Update the status
-      await StatusModel.findOneAndUpdate(
-        {},
-        {
-          message: newStatus,
-          updatedAt: new Date(),
-          updatedBy: user._id, // Reference to the User document
-        },
-        { upsert: true },
-      );
-
-      interaction.client.user.setActivity(newStatus, {
-        type: ActivityType.Custom,
-      });
-      await interaction.reply(`Bot status updated to: ${newStatus}`);
-    } catch (error) {
-      console.error('Error updating status:', error);
-      await interaction.reply(
-        'Failed to update status. Please try again later.',
-      );
+    if (state) update.status = state;
+    if (activity) {
+      update.activityType = activity === 'none' ? null : Number(activity);
     }
+    if (message !== null) update.activityName = message;
+
+    const botConfig = await Bot.findOneAndUpdate(
+      { clientId: config.clientId },
+      update,
+      { new: true, upsert: true },
+    );
+
+    interaction.client.user.setPresence({
+      status: botConfig.status,
+      activities:
+        botConfig.activityName && botConfig.activityType !== null
+          ? [{ type: botConfig.activityType, name: botConfig.activityName }]
+          : [],
+    });
+
+    const embed = createEmbed()
+      .setTitle('Status Updated')
+      .setColor(colors.success)
+      .addFields(
+        { name: 'State', value: botConfig.status, inline: true },
+        {
+          name: 'Activity',
+          value: getActivityName(botConfig.activityType),
+          inline: true,
+        },
+        {
+          name: 'Message',
+          value: botConfig.activityName || 'None',
+          inline: true,
+        },
+      );
+
+    await interaction.reply({ embeds: [embed] });
   },
 };
 
-export default command;
+function getActivityName(activityType: number | null): string {
+  if (activityType === null) return 'None';
+
+  const names: Record<number, string> = {
+    [BotActivityType.Playing]: 'Playing',
+    [BotActivityType.Streaming]: 'Streaming',
+    [BotActivityType.Listening]: 'Listening',
+    [BotActivityType.Watching]: 'Watching',
+    [BotActivityType.Competing]: 'Competing',
+    [BotActivityType.Custom]: 'Custom',
+  };
+
+  return names[activityType] ?? 'Unknown';
+}

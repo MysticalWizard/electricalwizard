@@ -1,9 +1,12 @@
-.DS_Store
 node_modules
-dist
 .env
 .env.*
 !.env.example
+
+# Ignore artifacts
+build/
+coverage/
+dist/
 
 # Ignore files for PNPM, NPM and YARN
 pnpm-lock.yaml

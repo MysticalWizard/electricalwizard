@@ -1,108 +1,149 @@
-# electricalwizard
+# ElectricalWizard
 
-ElectricalWizard is a Discord bot secretary specifically built for the n-th circle of hell. This guide will help you set up and run the bot.
+A Discord bot secretary for a small private server with friends — the n-th circle of hell. Built with TypeScript, Discord.js v14, and MongoDB.
+
+## Features
+
+- Slash commands
+- Birthday tracking and reminders
+- D-Day countdowns
+- Quote collection from messages
+- Nickname detection and automatic mentioning
+- Scheduled reminders with timezone support
+- Per-guild persistent storage
+
+## Design Notes
+
+- Strict TypeScript with ESM
+- Clear separation between Discord I/O and business logic
+- Services are framework-agnostic and testable in isolation
+- MongoDB schema design favors per-guild isolation
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
-
-- [Node.js](https://nodejs.org/) (version 18 or higher)
-- [pnpm](https://pnpm.io/) (version 10 or higher)
-- [MongoDB](https://www.mongodb.com/) (version 5 or higher)
+- [Node.js](https://nodejs.org/) v18+
+- [pnpm](https://pnpm.io/)
+- [MongoDB](https://www.mongodb.com/)
+- A [Discord application](https://discord.com/developers/applications) with a bot token
 
 ## Setup
 
 1. **Clone the repository**
 
-   ```bash
-   git clone https://github.com/yourusername/electricalwizard.git
+   ```sh
+   git clone https://github.com/MysticalWizard/electricalwizard.git
    cd electricalwizard
    ```
 
 2. **Install dependencies**
 
-   ```bash
+   ```sh
    pnpm install
    ```
 
 3. **Configure environment variables**
 
-   Create a `.env` file in the root directory and add the following variables:
-
-   ```
-   BOT_TOKEN="YOUR_BOT_TOKEN"
-   CLIENT_ID="YOUR_APPLICATION_ID"
-   GUILD_ID="YOUR_SERVER_ID"
-   OWNER_ID="YOUR_USER_ID"
-   MONGODB_URI="YOUR_MONGODB_URI"
-   PREFIX="!"
-   STATUS="hello world!"
+   ```sh
+   cp .env.example .env
    ```
 
-   Replace the placeholder values with your actual Discord bot token, application ID, server ID, your Discord user ID, and MongoDB connection URI.
+   Edit `.env` with your values:
 
-4. **Set up the database**
+   ```
+   BOT_TOKEN=YOUR_BOT_TOKEN
+   CLIENT_ID=YOUR_APPLICATION_ID
+   GUILD_ID=YOUR_SERVER_ID
+   OWNER_ID=YOUR_USER_ID
 
-   Ensure your MongoDB instance is running. The bot will automatically create the necessary collections when it starts.
-
-## Running the Bot
-
-1. **Build the project**
-
-   ```bash
-   pnpm run build
+   MONGODB_HOST=localhost:27017
+   MONGODB_DB=electricalwizard
+   # MONGODB_USER=
+   # MONGODB_PASSWORD=
    ```
 
-2. **Register slash commands**
+   > This project assumes a locally running MongoDB instance by default.
+   > Authentication is optional and can be enabled via `MONGODB_USER` / `MONGODB_PASSWORD`.
 
-   Before running the bot for the first time or after adding new commands, register the slash commands:
+4. **Deploy slash commands**
 
-   ```bash
-   pnpm run register
+   ```sh
+   pnpm deploy
    ```
 
-3. **Start the bot**
+   > This registers all slash commands with Discord. Commands marked as global are available everywhere; guild commands are registered to `GUILD_ID`.
 
-   For development:
+5. **Start the bot**
 
-   ```bash
-   pnpm run dev
+   ```sh
+   # Development (hot reload)
+   pnpm dev
+
+   # Production
+   pnpm build
+   pnpm start
    ```
 
-   For production:
+## Production Deployment
 
-   ```bash
-   pnpm run pm2:start
-   ```
+The bot includes [PM2](https://pm2.keymetrics.io/) scripts for process management:
 
-   Alternatively, you can start the bot in watch mode, which will automatically restart when you rebuild:
+```sh
+pnpm pm2:start      # Start the bot
+pnpm pm2:watch      # Start with file watching
+pnpm pm2:stop       # Stop the bot
+pnpm pm2:restart    # Restart the bot
+pnpm pm2:logs       # View logs
+pnpm pm2:delete     # Remove from PM2
+```
 
-   ```bash
-   pnpm run pm2:watch
-   ```
+> These scripts are intended for simple single-instance deployments.
+
+Make sure to run `pnpm build` before using PM2 commands.
+
+## Project Structure
+
+```
+src/
+  commands/      # Slash command definitions
+  events/        # Discord event handlers
+  models/        # Mongoose schemas (User, Guild, Quote...)
+  services/      # Business logic (database, nickname, scheduler...)
+  utils/         # Shared utilities (autocomplete, embeds, loaders...)
+  config.ts      # Environment configuration
+  deploy.ts      # Command registration script
+  main.ts        # Bot entry point
+  types.ts       # TypeScript interfaces
+  enums.ts       # Enum definitions
+```
 
 ## Development
 
-- Run `pnpm run lint` to check for linting errors.
-- Use `pnpm run format` to automatically format the code according to the project's style guidelines.
+```sh
+pnpm lint        # Run ESLint
+pnpm lint:fix    # Fix lint issues
+pnpm format      # Format with Prettier
+pnpm format:check # Check formatting
+```
 
-## Additional Commands
+A pre-commit hook (via [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged)) automatically lints and formats staged files.
 
-- `pnpm run pm2:watch`: Start the bot with PM2 in watch mode.
-- `pnpm run pm2:stop`: Stop the PM2 process for the bot.
-- `pnpm run pm2:restart`: Restart the PM2 process for the bot.
-- `pnpm run pm2:delete`: Delete the PM2 process for the bot.
+## Required Gateway Intents
 
-## Troubleshooting
+When inviting the bot to a server, it needs the following [gateway intents](https://discord.com/developers/docs/events/gateway#gateway-intents):
 
-If you encounter any issues:
+- **Guilds** - Track guild membership
+- **Guild Members** - Access member lists and user data
+- **Guild Messages** - Read messages for quote capture and nickname detection
+- **Message Content** - Read message content (privileged intent)
 
-1. Ensure all environment variables are correctly set in the `.env` file.
-2. Check that MongoDB is running and accessible.
-3. Verify that your Discord bot token is valid and has the necessary permissions.
-4. Make sure you've registered the slash commands after making any changes to them.
+## Tech Stack
 
-If problems persist, check the console output for error messages and refer to the Discord.js documentation or seek help in the Discord.js community.
+- **Runtime**: Node.js with ESM modules
+- **Language**: TypeScript (strict mode)
+- **Discord Library**: [discord.js](https://discord.js.org/) v14
+- **Database**: MongoDB via [Mongoose](https://mongoosejs.com/)
+- **Date Handling**: [Day.js](https://day.js.org/)
+- **Tooling**: ESLint, Prettier, Husky, lint-staged, tsx, tsc-alias
 
 ## License
 
