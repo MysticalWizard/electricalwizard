@@ -1,0 +1,54 @@
+{
+  "name": "electricalwizard",
+  "version": "4.0.0",
+  "type": "module",
+  "description": "A Discord bot secretary for the n-th circle of hell.",
+  "main": "dist/main.js",
+  "author": "MysticalWizard",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "watch": "tsc --watch",
+    "build": "tsc && tsc-alias",
+    "start": "node dist/main.js",
+    "pm2:start": "pm2 start dist/main.js --name electricalwizard",
+    "pm2:watch": "pm2 start dist/main.js --name electricalwizard --watch",
+    "pm2:stop": "pm2 stop electricalwizard",
+    "pm2:restart": "pm2 restart electricalwizard",
+    "pm2:logs": "pm2 logs electricalwizard",
+    "pm2:delete": "pm2 delete electricalwizard",
+    "deploy": "tsx src/deploy.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "dayjs": "^1.11.19",
+    "discord.js": "^14.25.1",
+    "dotenv": "^17.2.3",
+    "mongoose": "^9.1.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^24.10.10",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "globals": "^16.5.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  },
+  "lint-staged": {
+    "*.{ts,mjs}": "eslint --fix",
+    "*.{ts,mjs,json,md}": "prettier --write"
+  },
+  "packageManager": "pnpm@10.28.2+sha512.41872f037ad22f7348e3b1debbaf7e867cfd448f2726d9cf74c08f19507c31d2c8e7a11525b983febc2df640b5438dee6023ebb1f84ed43cc2d654d2bc326264"
+}
