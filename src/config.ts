@@ -28,4 +28,7 @@ export const config = {
   mongoUri: mongoAuth
     ? `mongodb://${mongoAuth}${mongoHost}/${mongoDb}?authSource=admin`
     : `mongodb://${mongoHost}/${mongoDb}`,
+  translationApiUrl:
+    process.env.TRANSLATION_API_URL ?? 'https://lang.mystwiz.net',
+  translationApiKey: requireEnv('TRANSLATION_API_KEY'),
 } as const;
