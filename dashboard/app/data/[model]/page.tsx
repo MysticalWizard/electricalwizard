@@ -133,7 +133,7 @@ export default function ModelPage() {
     }
 
     return cols;
-  }, [model, modelDef, canWrite]);
+  }, [modelDef, canWrite]);
 
   const table = useReactTable({
     data: data?.docs ?? [],

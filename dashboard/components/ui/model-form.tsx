@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { FieldDef } from '@electricalwizard/shared';
 
 interface ModelFormProps {
@@ -39,12 +39,15 @@ export function ModelForm({
   const [values, setValues] = useState<Record<string, unknown>>(() =>
     buildInitialValues(initial),
   );
+  const [prevInitial, setPrevInitial] = useState(initial);
 
-  useEffect(() => {
+  // Reset the form when a new `initial` record is supplied, adjusting state
+  // during render rather than in an effect (per React docs).
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
     setValues(buildInitialValues(initial));
     setErrors({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initial]);
+  }
 
   const set = (name: string, value: unknown) =>
     setValues((v) => ({ ...v, [name]: value }));

@@ -24,6 +24,7 @@
     "deploy": "tsx src/deploy.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:all": "eslint . && pnpm --filter @electricalwizard/dashboard lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"

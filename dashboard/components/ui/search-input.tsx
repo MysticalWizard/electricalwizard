@@ -16,10 +16,14 @@ export function SearchInput({
   delay = 300,
 }: SearchInputProps) {
   const [local, setLocal] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
 
-  useEffect(() => {
+  // Sync local state when the controlled `value` prop changes, adjusting
+  // during render rather than in an effect (per React docs).
+  if (value !== prevValue) {
+    setPrevValue(value);
     setLocal(value);
-  }, [value]);
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev --port 8450",
     "build": "next build",
-    "start": "next start --port 8450"
+    "start": "next start --port 8450",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@electricalwizard/shared": "workspace:*",
@@ -23,6 +25,9 @@
     "@types/react-dom": "^19.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
+    "eslint-config-prettier": "^10.1.8",
     "lucide-react": "^0.511.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.0",
