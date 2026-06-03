@@ -1,6 +1,6 @@
 # ElectricalWizard
 
-A Discord bot secretary for a small private server with friends — the n-th circle of hell. Built with TypeScript, Discord.js v14, and MongoDB.
+A Discord bot secretary for a small private server with friends — the n-th circle of hell. Built with TypeScript, Discord.js v14, and MongoDB, with a Next.js web dashboard.
 
 ## Features
 
@@ -10,14 +10,18 @@ A Discord bot secretary for a small private server with friends — the n-th cir
 - Quote collection from messages
 - Nickname detection and automatic mentioning
 - Scheduled reminders with timezone support
+- Message translation (reply with `translate`/`tr`/`tl`)
+- Web dashboard for analytics and data management
 - Per-guild persistent storage
 
 ## Design Notes
 
+- pnpm monorepo: the bot, the web dashboard, and a shared types package
 - Strict TypeScript with ESM
 - Clear separation between Discord I/O and business logic
 - Services are framework-agnostic and testable in isolation
 - MongoDB schema design favors per-guild isolation
+- The dashboard talks to an Express API served by the bot process (REST + SSE)
 
 ## Prerequisites
 
@@ -59,10 +63,23 @@ A Discord bot secretary for a small private server with friends — the n-th cir
    MONGODB_DB=electricalwizard
    # MONGODB_USER=
    # MONGODB_PASSWORD=
+
+   # Translation service
+   TRANSLATION_API_KEY=YOUR_TRANSLATION_API_KEY
+   # TRANSLATION_API_URL=https://lang.mystwiz.net
+
+   # Web dashboard
+   DISCORD_CLIENT_SECRET=YOUR_DISCORD_CLIENT_SECRET
+   WEB_PORT=7611
+   WEB_SESSION_SECRET=YOUR_SESSION_SECRET_32_CHARS_MIN
+   WEB_BASE_URL=http://localhost:3000
    ```
 
    > This project assumes a locally running MongoDB instance by default.
    > Authentication is optional and can be enabled via `MONGODB_USER` / `MONGODB_PASSWORD`.
+   >
+   > The translation feature requires `TRANSLATION_API_KEY`. The dashboard's
+   > Discord OAuth login requires `DISCORD_CLIENT_SECRET` and a session secret.
 
 4. **Deploy slash commands**
 
@@ -76,12 +93,17 @@ A Discord bot secretary for a small private server with friends — the n-th cir
 
    ```sh
    # Development (hot reload)
-   pnpm dev
+   pnpm dev            # bot only
+   pnpm dev:dashboard  # dashboard only
+   pnpm dev:all        # bot + dashboard together
 
    # Production
-   pnpm build
-   pnpm start
+   pnpm build:all      # build bot + dashboard (or `pnpm build` for bot only)
+   pnpm start          # start the bot (serves the dashboard API)
    ```
+
+   > The bot exposes the dashboard API on `WEB_PORT`; the Next.js dashboard
+   > runs separately (default `http://localhost:3000`).
 
 ## Production Deployment
 
@@ -107,20 +129,26 @@ src/
   commands/      # Slash command definitions
   events/        # Discord event handlers
   models/        # Mongoose schemas (User, Guild, Quote...)
-  services/      # Business logic (database, nickname, scheduler...)
+  services/      # Business logic (database, nickname, scheduler, translation...)
   utils/         # Shared utilities (autocomplete, embeds, loaders...)
+  web/           # Express dashboard API (routes, auth/session, SSE event bus)
   config.ts      # Environment configuration
   deploy.ts      # Command registration script
   main.ts        # Bot entry point
   types.ts       # TypeScript interfaces
   enums.ts       # Enum definitions
+
+dashboard/       # Next.js web dashboard (App Router)
+packages/
+  shared/        # Types shared between the bot and the dashboard
 ```
 
 ## Development
 
 ```sh
-pnpm lint        # Run ESLint
+pnpm lint        # Run ESLint (bot)
 pnpm lint:fix    # Fix lint issues
+pnpm lint:all    # Lint bot + dashboard
 pnpm format      # Format with Prettier
 pnpm format:check # Check formatting
 ```
@@ -143,6 +171,8 @@ When inviting the bot to a server, it needs the following [gateway intents](http
 - **Discord Library**: [discord.js](https://discord.js.org/) v14
 - **Database**: MongoDB via [Mongoose](https://mongoosejs.com/)
 - **Date Handling**: [Day.js](https://day.js.org/)
+- **Dashboard**: [Next.js](https://nextjs.org/) 16 + [React](https://react.dev/) 19, [TanStack Query/Table](https://tanstack.com/), [Recharts](https://recharts.org/), [Radix UI](https://www.radix-ui.com/)
+- **Monorepo**: pnpm workspaces
 - **Tooling**: ESLint, Prettier, Husky, lint-staged, tsx, tsc-alias
 
 ## License
