@@ -8,46 +8,55 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "dev:bot": "tsx watch src/main.ts",
+    "dev:dashboard": "pnpm --filter @electricalwizard/dashboard dev",
+    "dev:all": "concurrently \"pnpm dev:bot\" \"pnpm dev:dashboard\"",
     "watch": "tsc --watch",
     "build": "tsc && tsc-alias",
-    "start": "node dist/main.js",
+    "build:dashboard": "pnpm --filter @electricalwizard/dashboard build",
+    "build:all": "tsc && tsc-alias && pnpm --filter @electricalwizard/dashboard build",
+    "start": "NODE_ENV=production node dist/main.js",
     "pm2:start": "pm2 start ecosystem.config.cjs",
-    "pm2:stop": "pm2 stop electricalwizard",
-    "pm2:restart": "pm2 restart electricalwizard",
-    "pm2:logs": "pm2 logs electricalwizard",
-    "pm2:delete": "pm2 delete electricalwizard",
+    "pm2:stop": "pm2 stop ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart ecosystem.config.cjs",
+    "pm2:logs": "pm2 logs ecosystem.config.cjs",
+    "pm2:delete": "pm2 delete ecosystem.config.cjs",
     "deploy": "tsx src/deploy.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:all": "eslint . && pnpm --filter @electricalwizard/dashboard lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.14",
     "chalk": "^5.6.2",
-    "dayjs": "^1.11.19",
-    "discord.js": "^14.25.1",
-    "dotenv": "^17.2.3",
-    "mongoose": "^9.1.5"
+    "dayjs": "^1.11.21",
+    "discord.js": "^14.26.4",
+    "dotenv": "^17.4.2",
+    "hono": "^4.12.23",
+    "mongoose": "^9.6.3"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "@types/node": "^24.10.10",
-    "eslint": "^9.39.2",
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^24.12.4",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "globals": "^16.5.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
-    "prettier": "^3.8.1",
-    "tsc-alias": "^1.8.16",
-    "tsx": "^4.21.0",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
+    "tsc-alias": "^1.8.17",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.54.0"
+    "typescript-eslint": "^8.60.1"
   },
   "lint-staged": {
     "*.{ts,mjs}": "eslint --fix",
     "*.{ts,mjs,json,md}": "prettier --write"
   },
-  "packageManager": "pnpm@10.28.2+sha512.41872f037ad22f7348e3b1debbaf7e867cfd448f2726d9cf74c08f19507c31d2c8e7a11525b983febc2df640b5438dee6023ebb1f84ed43cc2d654d2bc326264"
+  "packageManager": "pnpm@11.5.1+sha512.93f7b57422ea7068257235b4c16eb60762eb68e1dc23723199cc739043ea9be2c4143274a399d8c6defa2b1176226d9ca1c4b63482d6200c1a8fbaa78c1d1485"
 }

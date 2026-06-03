@@ -12,6 +12,10 @@ config.json
 /build/
 /out/
 
+# next.js (dashboard)
+.next/
+next-env.d.ts
+
 # test coverage
 coverage/
 

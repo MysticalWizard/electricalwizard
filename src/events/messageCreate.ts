@@ -3,11 +3,18 @@ import type { Event } from '@/types.js';
 import { findNicknameMatches } from '@/services/nickname.js';
 import { addQuote } from '@/services/quote.js';
 import {
+  translateText,
+  getFlagForLang,
+  resolveLanguage,
+} from '@/services/translation.js';
+import {
   formatQuoteDisplay,
   getFormattedUserName,
 } from '@/utils/formatName.js';
+import { createEmbed } from '@/utils/embeds.js';
 
 const QUOTE_REGEX = /^quote(?:\s+(.+))?$/i;
+const TRANSLATE_REGEX = /^(?:translate|tr|tl)(?:\s+(.+))?$/i;
 
 async function handleQuoteReply(
   message: Message<true>,
@@ -79,6 +86,51 @@ async function handleQuoteReply(
   }
 }
 
+async function handleTranslateReply(
+  message: Message<true>,
+  langArg?: string,
+): Promise<void> {
+  try {
+    const referencedMessage = await message.channel.messages.fetch(
+      message.reference!.messageId!,
+    );
+
+    if (!referencedMessage.content.trim()) {
+      await message.reply({
+        content: 'That message has no text content to translate.',
+        allowedMentions: { repliedUser: false },
+      });
+      return;
+    }
+
+    await message.channel.sendTyping();
+    const result = await translateText(
+      referencedMessage.content,
+      resolveLanguage(langArg ?? 'en'),
+    );
+
+    const flag = getFlagForLang(result.targetLang);
+
+    const embed = createEmbed()
+      .setTitle(`${flag} Translation to ${result.targetLangName}`)
+      .setDescription(result.translatedText)
+      .setFooter({
+        text: `Detected source: ${result.detectedSourceLangName}`,
+      });
+
+    await message.reply({
+      embeds: [embed],
+      allowedMentions: { repliedUser: false },
+    });
+  } catch (error) {
+    console.error('Error translating message:', error);
+    await message.reply({
+      content: 'Translation failed. Please try again later.',
+      allowedMentions: { repliedUser: false },
+    });
+  }
+}
+
 export const event: Event<Events.MessageCreate> = {
   name: Events.MessageCreate,
   once: false,
@@ -93,6 +145,15 @@ export const event: Event<Events.MessageCreate> = {
         await handleQuoteReply(
           message as Message<true>,
           match[1]?.trim() || undefined,
+        );
+        return;
+      }
+
+      const translateMatch = message.content.match(TRANSLATE_REGEX);
+      if (translateMatch) {
+        await handleTranslateReply(
+          message as Message<true>,
+          translateMatch[1]?.trim().toLowerCase() || undefined,
         );
         return;
       }

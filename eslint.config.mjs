@@ -11,6 +11,9 @@ export default [
       '**/.*',
       '**/node_modules/**',
       '**/dist/**',
+      // The dashboard is a Next.js app that owns its own linting (Next/React
+      // plugins). Linting it from the root config errors on unknown rules.
+      'dashboard/**',
       '**/logs/**',
       '**/*.log',
       '**/pnpm-lock.yaml',

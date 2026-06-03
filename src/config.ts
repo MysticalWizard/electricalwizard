@@ -28,4 +28,11 @@ export const config = {
   mongoUri: mongoAuth
     ? `mongodb://${mongoAuth}${mongoHost}/${mongoDb}?authSource=admin`
     : `mongodb://${mongoHost}/${mongoDb}`,
+  translationApiUrl:
+    process.env.TRANSLATION_API_URL ?? 'https://lang.mystwiz.net',
+  translationApiKey: requireEnv('TRANSLATION_API_KEY'),
+  discordClientSecret: requireEnv('DISCORD_CLIENT_SECRET'),
+  webPort: parseInt(process.env.WEB_PORT ?? '7611', 10),
+  webSessionSecret: requireEnv('WEB_SESSION_SECRET'),
+  webBaseUrl: requireEnv('WEB_BASE_URL'),
 } as const;
