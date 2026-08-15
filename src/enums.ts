@@ -19,5 +19,4 @@ export const BotActivityType = {
 } as const;
 
 export type BotActivity =
-  | (typeof BotActivityType)[keyof typeof BotActivityType]
-  | null;
+  (typeof BotActivityType)[keyof typeof BotActivityType] | null;

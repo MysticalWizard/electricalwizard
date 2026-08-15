@@ -1,11 +1,7 @@
 import { Schema, model, type Document } from 'mongoose';
 
 export type ReminderFrequency =
-  | 'everyday'
-  | 'everyweek'
-  | 'everymonth'
-  | 'everyyear'
-  | null;
+  'everyday' | 'everyweek' | 'everymonth' | 'everyyear' | null;
 
 export interface IDDay extends Document {
   guildId: string;
