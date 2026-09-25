@@ -4,13 +4,13 @@
     // File Layout
     "rootDir": "./src",
     "outDir": "./dist",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
 
     // Environment Settings
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    // Resolve package.json "#/*" imports to ./src (see "imports" there);
+    // at runtime they default to ./dist.
+    "customConditions": ["development"],
     "target": "esnext",
     "lib": ["esnext"],
     "types": ["node"],

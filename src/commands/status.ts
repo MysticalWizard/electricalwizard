@@ -3,11 +3,11 @@ import {
   PermissionFlagsBits,
   type ChatInputCommandInteraction,
 } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
-import { Bot } from '@/models/Bot.js';
-import { BotStatus, BotActivityType } from '@/enums.js';
-import { config } from '@/config.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
+import type { SlashCommand } from '#/types.js';
+import { Bot } from '#/models/Bot.js';
+import { BotStatus, BotActivityType } from '#/enums.js';
+import { config } from '#/config.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
 
 export const command: SlashCommand = {
   data: new SlashCommandBuilder()

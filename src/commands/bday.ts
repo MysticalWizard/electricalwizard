@@ -4,14 +4,14 @@ import {
   type ChatInputCommandInteraction,
   type GuildMember,
 } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
+import type { SlashCommand } from '#/types.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
 import {
   getBirthday,
   upsertBirthday,
   parseBirthday,
   formatBirthday,
-} from '@/services/birthday.js';
+} from '#/services/birthday.js';
 
 export const command: SlashCommand = {
   data: new SlashCommandBuilder()

@@ -1,4 +1,4 @@
-import { config } from '@/config.js';
+import { config } from '#/config.js';
 
 const API = 'https://discord.com/api/v10';
 const REDIRECT_URI = `${config.webBaseUrl}/auth/callback`;

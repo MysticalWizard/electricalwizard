@@ -1,5 +1,5 @@
-import { Reminder, type IReminder } from '@/models/Reminder.js';
-import { User } from '@/models/User.js';
+import { Reminder, type IReminder } from '#/models/Reminder.js';
+import { User } from '#/models/User.js';
 
 export interface CreateReminderData {
   guildId: string;

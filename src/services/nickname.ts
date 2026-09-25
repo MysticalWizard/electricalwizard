@@ -1,6 +1,6 @@
-import { Guild } from '@/models/Guild.js';
-import { Nickname, type INickname } from '@/models/Nickname.js';
-import { User } from '@/models/User.js';
+import { Guild } from '#/models/Guild.js';
+import { Nickname, type INickname } from '#/models/Nickname.js';
+import { User } from '#/models/User.js';
 
 export interface NicknameMatch {
   nickname: string;

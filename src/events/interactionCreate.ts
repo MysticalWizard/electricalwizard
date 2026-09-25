@@ -1,5 +1,5 @@
 import { Events } from 'discord.js';
-import type { Event } from '@/types.js';
+import type { Event } from '#/types.js';
 
 export const event: Event<Events.InteractionCreate> = {
   name: Events.InteractionCreate,

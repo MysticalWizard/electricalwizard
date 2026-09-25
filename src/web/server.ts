@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import chalk from 'chalk';
-import { config } from '@/config.js';
+import { config } from '#/config.js';
 import { auth } from './routes/auth.js';
 import { api } from './routes/api.js';
 import { events } from './routes/events.js';

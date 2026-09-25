@@ -7,12 +7,12 @@ import {
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import tz from 'dayjs/plugin/timezone.js';
-import type { SlashCommand } from '@/types.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
-import { getSupportedTimezones, isValidTimezone } from '@/utils/timezone.js';
-import { requireGuild } from '@/utils/guards.js';
-import { respondTimezoneAutocomplete } from '@/utils/autocomplete.js';
-import { User } from '@/models/User.js';
+import type { SlashCommand } from '#/types.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
+import { getSupportedTimezones, isValidTimezone } from '#/utils/timezone.js';
+import { requireGuild } from '#/utils/guards.js';
+import { respondTimezoneAutocomplete } from '#/utils/autocomplete.js';
+import { User } from '#/models/User.js';
 
 dayjs.extend(utc);
 dayjs.extend(tz);

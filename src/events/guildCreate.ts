@@ -1,6 +1,6 @@
 import { Events } from 'discord.js';
-import type { Event } from '@/types.js';
-import { Guild } from '@/models/Guild.js';
+import type { Event } from '#/types.js';
+import { Guild } from '#/models/Guild.js';
 
 export const event: Event<Events.GuildCreate> = {
   name: Events.GuildCreate,

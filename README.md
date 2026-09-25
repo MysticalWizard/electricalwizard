@@ -173,7 +173,7 @@ When inviting the bot to a server, it needs the following [gateway intents](http
 - **Date Handling**: [Day.js](https://day.js.org/)
 - **Dashboard**: [Next.js](https://nextjs.org/) 16 + [React](https://react.dev/) 19, [TanStack Query/Table](https://tanstack.com/), [Recharts](https://recharts.org/), [Radix UI](https://www.radix-ui.com/)
 - **Monorepo**: pnpm workspaces
-- **Tooling**: ESLint, Prettier, Husky, lint-staged, tsx, tsc-alias
+- **Tooling**: ESLint, Prettier, Husky, lint-staged, tsx
 
 ## License
 

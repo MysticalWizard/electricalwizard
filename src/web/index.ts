@@ -1,4 +1,4 @@
-import { connectDatabase } from '@/services/database.js';
+import { connectDatabase } from '#/services/database.js';
 import { startWebServer } from './server.js';
 
 async function main() {

@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import { readdirSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
-import type { Event, SlashCommand } from '@/types.js';
+import type { Event, SlashCommand } from '#/types.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 

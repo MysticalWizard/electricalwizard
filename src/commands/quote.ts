@@ -8,9 +8,9 @@ import {
   type ChatInputCommandInteraction,
   type GuildMember,
 } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
-import { User } from '@/models/User.js';
-import type { IQuote } from '@/models/Quote.js';
+import type { SlashCommand } from '#/types.js';
+import { User } from '#/models/User.js';
+import type { IQuote } from '#/models/Quote.js';
 import {
   addQuote,
   canDeleteQuote,
@@ -23,14 +23,14 @@ import {
   getQuotesByYear,
   getRandomQuotes,
   getUsersWithNames,
-} from '@/services/quote.js';
+} from '#/services/quote.js';
 import {
   formatNameWithInitials,
   formatQuoteDisplay,
   getFormattedUserName,
-} from '@/utils/formatName.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
-import { requireGuild, isAdmin } from '@/utils/guards.js';
+} from '#/utils/formatName.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
+import { requireGuild, isAdmin } from '#/utils/guards.js';
 
 async function formatQuoteForDisplay(quote: IQuote): Promise<string> {
   let displayName = quote.authorName ?? 'Unknown';

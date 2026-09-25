@@ -3,17 +3,17 @@ import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
 } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
-import { parseTimeInput, formatDateInTimezone } from '@/utils/parseTime.js';
+import type { SlashCommand } from '#/types.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
+import { parseTimeInput, formatDateInTimezone } from '#/utils/parseTime.js';
 import {
   getSupportedTimezones,
   validateTimezone,
   resolveTimezone,
-} from '@/utils/timezone.js';
-import { truncate } from '@/utils/formatName.js';
-import { requireGuild } from '@/utils/guards.js';
-import { respondTimezoneAutocomplete } from '@/utils/autocomplete.js';
+} from '#/utils/timezone.js';
+import { truncate } from '#/utils/formatName.js';
+import { requireGuild } from '#/utils/guards.js';
+import { respondTimezoneAutocomplete } from '#/utils/autocomplete.js';
 import {
   createDDay,
   getUserDDays,
@@ -22,8 +22,8 @@ import {
   getDDaysForAutocomplete,
   calculateDaysUntil,
   formatDDayDisplay,
-} from '@/services/dday.js';
-import type { ReminderFrequency } from '@/models/DDay.js';
+} from '#/services/dday.js';
+import type { ReminderFrequency } from '#/models/DDay.js';
 
 const allTimezones = getSupportedTimezones();
 

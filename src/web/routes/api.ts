@@ -78,8 +78,8 @@ api.get('/stats', async (c) => {
     stats[name] = await def.model.countDocuments(filter);
   }
 
-  const { Reminder } = await import('@/models/Reminder.js');
-  const { DDay } = await import('@/models/DDay.js');
+  const { Reminder } = await import('#/models/Reminder.js');
+  const { DDay } = await import('#/models/DDay.js');
   stats.activeReminders = await Reminder.countDocuments({
     triggerAt: { $gt: new Date() },
     ...(isPrivileged ? {} : { userId: session.userId }),

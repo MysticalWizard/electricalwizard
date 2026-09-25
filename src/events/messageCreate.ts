@@ -1,17 +1,17 @@
 import { Events, type Message } from 'discord.js';
-import type { Event } from '@/types.js';
-import { findNicknameMatches } from '@/services/nickname.js';
-import { addQuote } from '@/services/quote.js';
+import type { Event } from '#/types.js';
+import { findNicknameMatches } from '#/services/nickname.js';
+import { addQuote } from '#/services/quote.js';
 import {
   translateText,
   getFlagForLang,
   resolveLanguage,
-} from '@/services/translation.js';
+} from '#/services/translation.js';
 import {
   formatQuoteDisplay,
   getFormattedUserName,
-} from '@/utils/formatName.js';
-import { createEmbed } from '@/utils/embeds.js';
+} from '#/utils/formatName.js';
+import { createEmbed } from '#/utils/embeds.js';
 
 const QUOTE_REGEX = /^quote(?:\s+(.+))?$/i;
 const TRANSLATE_REGEX = /^(?:translate|tr|tl)(?:\s+(.+))?$/i;

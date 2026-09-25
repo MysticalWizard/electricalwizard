@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import type { ChatInputCommandInteraction } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
-import { createEmbed } from '@/utils/embeds.js';
+import type { SlashCommand } from '#/types.js';
+import { createEmbed } from '#/utils/embeds.js';
 
 export const command: SlashCommand = {
   data: new SlashCommandBuilder()

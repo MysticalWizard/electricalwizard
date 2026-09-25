@@ -3,28 +3,28 @@ import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
 } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
+import type { SlashCommand } from '#/types.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
 import {
   getSupportedTimezones,
   validateTimezone,
   resolveTimezone,
-} from '@/utils/timezone.js';
-import { truncate } from '@/utils/formatName.js';
-import { requireGuild } from '@/utils/guards.js';
-import { respondTimezoneAutocomplete } from '@/utils/autocomplete.js';
+} from '#/utils/timezone.js';
+import { truncate } from '#/utils/formatName.js';
+import { requireGuild } from '#/utils/guards.js';
+import { respondTimezoneAutocomplete } from '#/utils/autocomplete.js';
 import {
   parseTimeInput,
   formatDuration,
   formatDateInTimezone,
-} from '@/utils/parseTime.js';
+} from '#/utils/parseTime.js';
 import {
   createReminder,
   getUserReminders,
   cancelReminder,
   getUsedTimezones,
   getRemindersForAutocomplete,
-} from '@/services/reminder.js';
+} from '#/services/reminder.js';
 
 const allTimezones = getSupportedTimezones();
 

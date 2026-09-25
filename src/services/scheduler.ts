@@ -1,12 +1,12 @@
 import type { Client, TextChannel } from 'discord.js';
-import { getDueReminders } from '@/services/reminder.js';
+import { getDueReminders } from '#/services/reminder.js';
 import {
   getDueDDayNotifications,
   processCompletedDDays,
   calculateDaysUntil,
   formatDDayDisplay,
-} from '@/services/dday.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
+} from '#/services/dday.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
 
 const CHECK_INTERVAL = 30_000; // 30 seconds
 

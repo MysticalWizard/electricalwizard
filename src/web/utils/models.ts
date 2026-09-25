@@ -1,11 +1,11 @@
 import type { Model } from 'mongoose';
-import { User } from '@/models/User.js';
-import { Guild } from '@/models/Guild.js';
-import { Bot } from '@/models/Bot.js';
-import { Reminder } from '@/models/Reminder.js';
-import { DDay } from '@/models/DDay.js';
-import { Quote } from '@/models/Quote.js';
-import { Nickname } from '@/models/Nickname.js';
+import { User } from '#/models/User.js';
+import { Guild } from '#/models/Guild.js';
+import { Bot } from '#/models/Bot.js';
+import { Reminder } from '#/models/Reminder.js';
+import { DDay } from '#/models/DDay.js';
+import { Quote } from '#/models/Quote.js';
+import { Nickname } from '#/models/Nickname.js';
 
 export interface FieldDef {
   name: string;

@@ -1,4 +1,4 @@
-import { DDay, type IDDay, type ReminderFrequency } from '@/models/DDay.js';
+import { DDay, type IDDay, type ReminderFrequency } from '#/models/DDay.js';
 
 export interface CreateDDayData {
   guildId: string;

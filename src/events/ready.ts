@@ -1,10 +1,10 @@
 import { Events } from 'discord.js';
 import chalk from 'chalk';
-import type { Event } from '@/types.js';
-import { Bot } from '@/models/Bot.js';
-import { Guild } from '@/models/Guild.js';
-import { config } from '@/config.js';
-import { startReminderScheduler } from '@/services/scheduler.js';
+import type { Event } from '#/types.js';
+import { Bot } from '#/models/Bot.js';
+import { Guild } from '#/models/Guild.js';
+import { config } from '#/config.js';
+import { startReminderScheduler } from '#/services/scheduler.js';
 
 export const event: Event<Events.ClientReady> = {
   name: Events.ClientReady,

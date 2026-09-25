@@ -1,6 +1,6 @@
-import { Counter, Quote, type IQuote } from '@/models/Quote.js';
-import { User } from '@/models/User.js';
-import { formatNameWithInitials } from '@/utils/formatName.js';
+import { Counter, Quote, type IQuote } from '#/models/Quote.js';
+import { User } from '#/models/User.js';
+import { formatNameWithInitials } from '#/utils/formatName.js';
 
 export interface AddQuoteData {
   guildId: string;

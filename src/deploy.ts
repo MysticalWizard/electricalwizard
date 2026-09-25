@@ -3,8 +3,8 @@ import { REST, Routes } from 'discord.js';
 import { readdirSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
-import { config } from '@/config.js';
-import type { SlashCommand } from '@/types.js';
+import { config } from '#/config.js';
+import type { SlashCommand } from '#/types.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 

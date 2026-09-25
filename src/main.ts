@@ -1,8 +1,8 @@
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import chalk from 'chalk';
-import { config } from '@/config.js';
-import { loadCommands, loadEvents } from '@/utils/loaders.js';
-import { connectDatabase } from '@/services/database.js';
+import { config } from '#/config.js';
+import { loadCommands, loadEvents } from '#/utils/loaders.js';
+import { connectDatabase } from '#/services/database.js';
 
 const client = new Client({
   intents: [

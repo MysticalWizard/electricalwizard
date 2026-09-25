@@ -1,4 +1,4 @@
-import { User } from '@/models/User.js';
+import { User } from '#/models/User.js';
 
 /**
  * Join first and last name parts into a full name string.

@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat.js';
-import { User } from '@/models/User.js';
+import { User } from '#/models/User.js';
 
 dayjs.extend(customParseFormat);
 

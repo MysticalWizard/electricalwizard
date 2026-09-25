@@ -5,9 +5,9 @@ import {
   type ChatInputCommandInteraction,
   type GuildMember,
 } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
-import { requireGuild, isAdmin } from '@/utils/guards.js';
+import type { SlashCommand } from '#/types.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
+import { requireGuild, isAdmin } from '#/utils/guards.js';
 import {
   addNickname,
   removeNickname,
@@ -17,7 +17,7 @@ import {
   getNicknameOwner,
   setNicknameAnnounce,
   toggleUserNicknameAnnounce,
-} from '@/services/nickname.js';
+} from '#/services/nickname.js';
 
 export const command: SlashCommand = {
   data: new SlashCommandBuilder()

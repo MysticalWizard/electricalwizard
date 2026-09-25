@@ -4,7 +4,7 @@ import {
   BotActivityType,
   type BotStatusType,
   type BotActivity,
-} from '@/enums.js';
+} from '#/enums.js';
 
 export interface IBot extends Document {
   clientId: string;

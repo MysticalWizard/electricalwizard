@@ -4,13 +4,13 @@ import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
 } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
-import { colors, createEmbed } from '@/utils/embeds.js';
-import { getSupportedTimezones, validateTimezone } from '@/utils/timezone.js';
-import { formatFullName } from '@/utils/formatName.js';
-import { requireGuild } from '@/utils/guards.js';
-import { respondTimezoneAutocomplete } from '@/utils/autocomplete.js';
-import { User } from '@/models/User.js';
+import type { SlashCommand } from '#/types.js';
+import { colors, createEmbed } from '#/utils/embeds.js';
+import { getSupportedTimezones, validateTimezone } from '#/utils/timezone.js';
+import { formatFullName } from '#/utils/formatName.js';
+import { requireGuild } from '#/utils/guards.js';
+import { respondTimezoneAutocomplete } from '#/utils/autocomplete.js';
+import { User } from '#/models/User.js';
 
 const timezones = getSupportedTimezones();
 

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import type { ChatInputCommandInteraction } from 'discord.js';
-import type { SlashCommand } from '@/types.js';
+import type { SlashCommand } from '#/types.js';
 
 function shuffle<T>(array: T[]): T[] {
   const shuffled = [...array];

@@ -1,5 +1,5 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
-import { User } from '@/models/User.js';
+import { User } from '#/models/User.js';
 
 /**
  * Validate if a string is a valid IANA timezone

@@ -6,7 +6,7 @@ import {
 } from 'node:crypto';
 import type { Context } from 'hono';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
-import { config } from '@/config.js';
+import { config } from '#/config.js';
 
 export interface Session {
   userId: string;
