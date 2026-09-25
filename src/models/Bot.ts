@@ -5,6 +5,7 @@ import {
   type BotStatusType,
   type BotActivity,
 } from '#/enums.js';
+import { changeFeedPlugin } from '#/services/changeFeed.js';
 
 export interface IBot extends Document {
   clientId: string;
@@ -41,5 +42,7 @@ const botSchema = new Schema<IBot>(
     timestamps: true,
   },
 );
+
+botSchema.plugin(changeFeedPlugin);
 
 export const Bot = model<IBot>('Bot', botSchema);

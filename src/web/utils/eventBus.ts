@@ -1,16 +1,10 @@
 import { EventEmitter } from 'node:events';
+import type { ChangeAction } from '#/services/changeFeed.js';
 
 export interface DbChangeEvent {
   model: string;
-  action: 'create' | 'update' | 'delete';
-  id: string;
-  timestamp: number;
-}
-
-export interface BotStatusEvent {
-  status: string;
-  activityType: number | null;
-  activityName: string;
+  action: ChangeAction;
+  id?: string | undefined;
   timestamp: number;
 }
 
@@ -19,23 +13,10 @@ bus.setMaxListeners(50);
 
 export function emitDbChange(
   model: string,
-  action: DbChangeEvent['action'],
-  id: string,
+  action: ChangeAction,
+  id?: string,
 ): void {
   bus.emit('db:change', { model, action, id, timestamp: Date.now() });
-}
-
-export function emitBotStatus(
-  status: string,
-  activityType: number | null,
-  activityName: string,
-): void {
-  bus.emit('bot:status', {
-    status,
-    activityType,
-    activityName,
-    timestamp: Date.now(),
-  });
 }
 
 export { bus as eventBus };

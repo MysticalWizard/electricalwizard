@@ -1,4 +1,5 @@
 import { Schema, model, type Document } from 'mongoose';
+import { changeFeedPlugin } from '#/services/changeFeed.js';
 
 // Counter schema for per-guild auto-increment
 const counterSchema = new Schema({
@@ -75,5 +76,7 @@ quoteSchema.pre('save', async function () {
 quoteSchema.index({ guildId: 1, quoteNumber: 1 }, { unique: true });
 quoteSchema.index({ guildId: 1, authorId: 1 });
 quoteSchema.index({ guildId: 1, year: 1 });
+
+quoteSchema.plugin(changeFeedPlugin);
 
 export const Quote = model<IQuote>('Quote', quoteSchema);

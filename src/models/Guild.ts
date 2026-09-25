@@ -1,4 +1,5 @@
 import { Schema, model, type Document } from 'mongoose';
+import { changeFeedPlugin } from '#/services/changeFeed.js';
 
 export interface IGuild extends Document {
   guildId: string;
@@ -28,5 +29,7 @@ const guildSchema = new Schema<IGuild>(
     timestamps: true,
   },
 );
+
+guildSchema.plugin(changeFeedPlugin);
 
 export const Guild = model<IGuild>('Guild', guildSchema);

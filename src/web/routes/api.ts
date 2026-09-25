@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth.js';
 import { getSession, type Session } from '../middleware/session.js';
 import { modelRegistry } from '../utils/models.js';
-import { emitDbChange } from '../utils/eventBus.js';
 
 const api = new Hono();
 
@@ -273,9 +272,6 @@ api.post('/:model', async (c) => {
 
   const filtered = filterFields(modelName, body);
   const doc = await def.model.create(filtered);
-  const id = String((doc as { _id: unknown })._id);
-
-  emitDbChange(modelName, 'create', id);
   return c.json(doc, 201);
 });
 
@@ -308,7 +304,6 @@ api.put('/:model/:id', async (c) => {
   });
   if (!doc) return c.json({ error: 'Not found' }, 404);
 
-  emitDbChange(modelName, 'update', c.req.param('id'));
   return c.json(doc);
 });
 
@@ -335,7 +330,6 @@ api.delete('/:model/:id', async (c) => {
   const doc = await def.model.findByIdAndDelete(c.req.param('id'));
   if (!doc) return c.json({ error: 'Not found' }, 404);
 
-  emitDbChange(modelName, 'delete', c.req.param('id'));
   return c.json({ deleted: true });
 });
 

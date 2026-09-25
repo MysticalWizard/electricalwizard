@@ -1,4 +1,5 @@
 import { Schema, model, type Document } from 'mongoose';
+import { changeFeedPlugin } from '#/services/changeFeed.js';
 
 export interface IUser extends Document {
   discordId: string;
@@ -52,5 +53,7 @@ const userSchema = new Schema<IUser>(
     timestamps: true,
   },
 );
+
+userSchema.plugin(changeFeedPlugin);
 
 export const User = model<IUser>('User', userSchema);

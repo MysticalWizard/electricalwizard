@@ -1,4 +1,5 @@
 import { Schema, model, type Document } from 'mongoose';
+import { changeFeedPlugin } from '#/services/changeFeed.js';
 
 export interface INickname extends Document {
   guildId: string;
@@ -33,5 +34,7 @@ nicknameSchema.index({ guildId: 1, nickname: 1 }, { unique: true });
 
 // Index for efficient lookup by user within a guild
 nicknameSchema.index({ guildId: 1, userId: 1 });
+
+nicknameSchema.plugin(changeFeedPlugin);
 
 export const Nickname = model<INickname>('Nickname', nicknameSchema);

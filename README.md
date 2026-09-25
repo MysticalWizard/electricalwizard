@@ -22,10 +22,11 @@ A Discord bot secretary for a small private server with friends — the n-th cir
 - Services hold the business logic; only the scheduler talks to Discord directly
 - MongoDB schema design favors per-guild isolation
 - The dashboard talks to a Hono API (REST + SSE) that runs as its own process, separate from the bot
+- Writes from either process are recorded in a capped MongoDB collection (`changefeed`), which the API follows to push live updates to the dashboard
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) v24.14+ (required for `#/` subpath imports)
+- [Node.js](https://nodejs.org/) v24.14+ (required for `#/` subpath imports; pnpm refuses to run on older versions)
 - [pnpm](https://pnpm.io/)
 - [MongoDB](https://www.mongodb.com/)
 - A [Discord application](https://discord.com/developers/applications) with a bot token
@@ -97,20 +98,21 @@ A Discord bot secretary for a small private server with friends — the n-th cir
    ```sh
    # Development (hot reload)
    pnpm dev            # bot only
+   pnpm dev:web        # dashboard API only
    pnpm dev:dashboard  # dashboard only
-   pnpm dev:all        # bot + dashboard together
+   pnpm dev:all        # bot + API + dashboard together
 
    # Production
    pnpm build:all      # build bot, API and dashboard (or `pnpm build` for bot + API)
    pnpm start          # start the bot
+   pnpm start:web      # start the dashboard API
    ```
 
    > The dashboard API is its own process (`src/web/index.ts`, built to
-   > `dist/web/index.js`) listening on `WEB_PORT`. No pnpm script starts it on
-   > its own; PM2 runs it alongside the bot and dashboard (see below). The
-   > Next.js dashboard runs on port 8450 and proxies `/api` and `/auth` to
-   > `http://localhost:7611`, so keep `WEB_PORT=7611` unless you also change
-   > `dashboard/next.config.ts`.
+   > `dist/web/index.js`) listening on `WEB_PORT`; PM2 runs it alongside the
+   > bot and dashboard (see below). The Next.js dashboard runs on port 8450
+   > and proxies `/api` and `/auth` to `http://localhost:7611`, so keep
+   > `WEB_PORT=7611` unless you also change `dashboard/next.config.ts`.
 
 ## Production Deployment
 

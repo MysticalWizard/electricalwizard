@@ -1,4 +1,5 @@
 import { Schema, model, type Document } from 'mongoose';
+import { changeFeedPlugin } from '#/services/changeFeed.js';
 
 export type ReminderFrequency =
   'everyday' | 'everyweek' | 'everymonth' | 'everyyear' | null;
@@ -79,5 +80,7 @@ const ddaySchema = new Schema<IDDay>(
 ddaySchema.index({ nextNotifyAt: 1 });
 ddaySchema.index({ userId: 1, guildId: 1 });
 ddaySchema.index({ targetDate: 1, completed: 1 });
+
+ddaySchema.plugin(changeFeedPlugin);
 
 export const DDay = model<IDDay>('DDay', ddaySchema);

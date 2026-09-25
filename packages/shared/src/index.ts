@@ -8,6 +8,5 @@ export type {
   ActivityItem,
   AnalyticsPoint,
   DbChangeEvent,
-  BotStatusEvent,
   SSEEvent,
 } from './types/dashboard.js';

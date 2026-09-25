@@ -54,20 +54,15 @@ export interface AnalyticsPoint {
 }
 
 export interface DbChangeEvent {
+  /** Model registry key, e.g. `ddays`. */
   model: string;
   action: 'create' | 'update' | 'delete';
-  id: string;
-  timestamp: number;
-}
-
-export interface BotStatusEvent {
-  status: string;
-  activityType: number | null;
-  activityName: string;
+  /** Absent for writes that can touch several documents. */
+  id?: string;
   timestamp: number;
 }
 
 export interface SSEEvent {
-  type: 'db:change' | 'bot:status';
-  data: Record<string, unknown>;
+  type: 'db:change';
+  data: DbChangeEvent;
 }

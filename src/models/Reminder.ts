@@ -1,4 +1,5 @@
 import { Schema, model, type Document } from 'mongoose';
+import { changeFeedPlugin } from '#/services/changeFeed.js';
 
 export interface IReminder extends Document {
   guildId: string;
@@ -49,5 +50,7 @@ const reminderSchema = new Schema<IReminder>(
 
 reminderSchema.index({ triggerAt: 1 });
 reminderSchema.index({ userId: 1, guildId: 1 });
+
+reminderSchema.plugin(changeFeedPlugin);
 
 export const Reminder = model<IReminder>('Reminder', reminderSchema);

@@ -14,7 +14,7 @@ export function useSSE() {
 
     const cleanup = createSSEConnection((event) => {
       if (event.type === 'db:change') {
-        const model = event.data.model as string;
+        const { model } = event.data;
         qc.invalidateQueries({ queryKey: ['documents', model] });
         qc.invalidateQueries({ queryKey: ['stats'] });
         qc.invalidateQueries({ queryKey: ['activity'] });

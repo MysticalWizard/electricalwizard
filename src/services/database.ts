@@ -1,9 +1,11 @@
 import chalk from 'chalk';
 import mongoose from 'mongoose';
 import { config } from '../config.js';
+import { ensureChangeFeed } from './changeFeed.js';
 
 export async function connectDatabase(): Promise<typeof mongoose> {
   const connection = await mongoose.connect(config.mongoUri);
+  await ensureChangeFeed();
   console.log(
     chalk.green(`✓ Connected to MongoDB: ${connection.connection.host}`),
   );

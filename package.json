@@ -10,18 +10,27 @@
       "default": "./dist/*"
     }
   },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=24.14.0",
+      "onFail": "error"
+    }
+  },
   "author": "MysticalWizard",
   "private": true,
   "scripts": {
     "dev": "tsx watch --conditions=development src/main.ts",
     "dev:bot": "tsx watch --conditions=development src/main.ts",
+    "dev:web": "tsx watch --conditions=development src/web/index.ts",
     "dev:dashboard": "pnpm --filter @electricalwizard/dashboard dev",
-    "dev:all": "concurrently \"pnpm dev:bot\" \"pnpm dev:dashboard\"",
+    "dev:all": "concurrently \"pnpm dev:bot\" \"pnpm dev:web\" \"pnpm dev:dashboard\"",
     "watch": "tsc --watch",
     "build": "tsc",
     "build:dashboard": "pnpm --filter @electricalwizard/dashboard build",
     "build:all": "tsc && pnpm --filter @electricalwizard/dashboard build",
     "start": "NODE_ENV=production node dist/main.js",
+    "start:web": "NODE_ENV=production node dist/web/index.js",
     "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop ecosystem.config.cjs",
     "pm2:restart": "pm2 restart ecosystem.config.cjs",

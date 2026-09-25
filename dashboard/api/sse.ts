@@ -13,13 +13,5 @@ export function createSSEConnection(
     }
   });
 
-  source.addEventListener('bot:status', (e) => {
-    try {
-      onEvent({ type: 'bot:status', data: JSON.parse(e.data) });
-    } catch {
-      /* malformed event data */
-    }
-  });
-
   return () => source.close();
 }

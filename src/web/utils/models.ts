@@ -145,3 +145,12 @@ export const modelRegistry: Record<string, ModelDef> = {
     ],
   },
 };
+
+const registryKeyByModelName = new Map(
+  Object.entries(modelRegistry).map(([key, def]) => [def.model.modelName, key]),
+);
+
+/** Registry key (e.g. `ddays`) for a Mongoose model name (e.g. `DDay`). */
+export function registryKeyFor(modelName: string): string | undefined {
+  return registryKeyByModelName.get(modelName);
+}
