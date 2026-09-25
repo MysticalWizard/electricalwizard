@@ -37,6 +37,7 @@
     "pm2:logs": "pm2 logs ecosystem.config.cjs",
     "pm2:delete": "pm2 delete ecosystem.config.cjs",
     "deploy": "tsx --conditions=development src/deploy.ts",
+    "db:backup": "bash scripts/backup-db.sh",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:all": "eslint . && pnpm --filter @electricalwizard/dashboard lint",
