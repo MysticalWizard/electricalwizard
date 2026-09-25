@@ -39,6 +39,7 @@
     "deploy": "node dist/deploy.js",
     "deploy:dev": "tsx --conditions=development src/deploy.ts",
     "db:backup": "bash scripts/backup-db.sh",
+    "db:export": "bash scripts/export-db.sh",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:all": "eslint . && pnpm --filter @electricalwizard/dashboard lint",

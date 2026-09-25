@@ -36,6 +36,7 @@ yarn-error.log*
 
 # runtime
 backups/
+exports/
 pids/
 *.pid
 *.seed
