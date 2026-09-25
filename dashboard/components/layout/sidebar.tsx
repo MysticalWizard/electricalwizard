@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, UserCircle, BarChart3, Zap } from 'lucide-react';
+import { LayoutDashboard, CircleUser, ChartColumn, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useModels } from '@/api/hooks';
 
 const navItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'My Profile', href: '/profile', icon: UserCircle },
-  { label: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { label: 'My Profile', href: '/profile', icon: CircleUser },
+  { label: 'Analytics', href: '/analytics', icon: ChartColumn },
 ];
 
 export function Sidebar() {

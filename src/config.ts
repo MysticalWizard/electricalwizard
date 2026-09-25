@@ -1,6 +1,10 @@
-import dotenv from 'dotenv';
-
-dotenv.config();
+// Load .env if present. Variables already in the environment (e.g. from
+// pm2's env_file) take precedence.
+try {
+  process.loadEnvFile();
+} catch (err) {
+  if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name];

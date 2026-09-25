@@ -32,6 +32,8 @@ import {
 } from '@/components/ui/dialog';
 
 type Doc = Record<string, unknown>;
+// Stable fallback so the table's row model isn't rebuilt every render while loading.
+const emptyDocs: Doc[] = [];
 const col = createColumnHelper<typeof dataTableFeatures, Doc>();
 
 export default function ModelPage() {
@@ -134,7 +136,7 @@ function ModelView({ model }: { model: string }) {
 
   const table = useTable({
     features: dataTableFeatures,
-    data: data?.docs ?? [],
+    data: data?.docs ?? emptyDocs,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
