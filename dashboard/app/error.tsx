@@ -21,6 +21,9 @@ export default function Error({
         <div className="flex gap-3 justify-center">
           <Button
             variant="outline"
+            // Full reload on purpose: it discards whatever client state led to
+            // the error, which a soft router navigation would keep.
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             onClick={() => (window.location.href = '/')}
           >
             Go Home

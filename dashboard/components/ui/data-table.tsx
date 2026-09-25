@@ -1,12 +1,22 @@
 'use client';
 
-import { flexRender, type Table as TanstackTable } from '@tanstack/react-table';
+import {
+  flexRender,
+  rowSortingFeature,
+  tableFeatures,
+  type RowData,
+  type Table as TanstackTable,
+} from '@tanstack/react-table';
 
-interface DataTableProps<T> {
-  table: TanstackTable<T>;
+// Features every DataTable relies on (header click-to-sort). Tables rendered
+// here must be created with these features.
+export const dataTableFeatures = tableFeatures({ rowSortingFeature });
+
+interface DataTableProps<T extends RowData> {
+  table: TanstackTable<typeof dataTableFeatures, T>;
 }
 
-export function DataTable<T>({ table }: DataTableProps<T>) {
+export function DataTable<T extends RowData>({ table }: DataTableProps<T>) {
   return (
     <div className="overflow-x-auto border border-border rounded-lg">
       <table className="w-full text-sm">
@@ -34,7 +44,7 @@ export function DataTable<T>({ table }: DataTableProps<T>) {
               key={row.id}
               className="border-b border-border hover:bg-surface-hover"
             >
-              {row.getVisibleCells().map((cell) => (
+              {row.getAllCells().map((cell) => (
                 <td key={cell.id} className="px-3 py-2">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>

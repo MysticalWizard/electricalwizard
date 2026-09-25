@@ -1,7 +1,7 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import importPlugin from 'eslint-plugin-import';
+import { importX } from 'eslint-plugin-import-x';
 import prettierConfig from 'eslint-config-prettier';
 
 export default [
@@ -39,12 +39,12 @@ export default [
       globals: globals.node,
     },
     plugins: {
-      import: importPlugin,
+      'import-x': importX,
     },
     rules: {
-      'import/first': 'error',
-      'import/newline-after-import': 'error',
-      'import/no-duplicates': 'error',
+      'import-x/first': 'error',
+      'import-x/newline-after-import': 'error',
+      'import-x/no-duplicates': 'error',
     },
   },
 

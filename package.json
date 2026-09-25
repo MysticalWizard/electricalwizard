@@ -30,33 +30,34 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.17",
+    "@hono/node-server": "^2.1.1",
     "chalk": "^6.0.0",
     "dayjs": "^1.11.23",
     "discord.js": "^14.27.0",
-    "dotenv": "^17.4.2",
-    "hono": "^4.13.7",
-    "mongoose": "^9.10.0"
+    "dotenv": "^18.0.3",
+    "hono": "^4.13.9",
+    "mongoose": "^9.10.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
-    "@types/node": "^24.13.4",
-    "concurrently": "^9.2.4",
-    "eslint": "^9.39.5",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.6",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-import": "^2.32.0",
-    "globals": "^16.5.0",
+    "eslint-plugin-import-x": "^4.17.1",
+    "globals": "^17.12.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
-    "prettier": "^3.9.6",
+    "lint-staged": "^17.5.1",
+    "prettier": "^3.9.9",
     "tsc-alias": "^1.9.5",
-    "tsx": "^4.23.13",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.70.0"
+    "tsx": "^4.23.15",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.70.1"
   },
   "lint-staged": {
     "*.{ts,mjs}": "eslint --fix",
     "*.{ts,mjs,json,md}": "prettier --write"
   },
-  "packageManager": "pnpm@12.4.1+sha512.2e81e399d73fe8390dab25e06aa788ab7a5908248d2f5a370f82b481147a6a7a367bf8048f9a6fdb6460f21a66f0542dedb8b94ca2c8723596741920b1656d4c"
+  "packageManager": "pnpm@12.6.0+sha512.3ef68f951cb111ac204b4a5a16f0b2ddf0da56a96e0413e81d855d9f0b55ef926714709028e1cd00c405c2c5fb7b9e8ec4dc46777c805d0373c2f2ff00fd20ec"
 }

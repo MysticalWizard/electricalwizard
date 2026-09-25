@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@electricalwizard/shared": "workspace:*",
-    "@tanstack/react-query": "^5.102.8",
-    "@tanstack/react-table": "^8.21.3",
-    "next": "^16.3.5",
+    "@tanstack/react-query": "^5.103.2",
+    "@tanstack/react-table": "^9.2.4",
+    "next": "^16.3.6",
     "radix-ui": "^1.6.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -23,14 +23,19 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.3.5",
+    "eslint-config-next": "^16.3.6",
     "eslint-config-prettier": "^10.1.8",
-    "lucide-react": "^0.511.0",
+    "lucide-react": "^1.48.0",
     "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5.9.3"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,mjs}": "eslint --fix",
+    "*.{ts,tsx,mjs,json,md}": "prettier --write"
   }
 }

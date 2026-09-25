@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import {
   createColumnHelper,
-  getCoreRowModel,
-  useReactTable,
+  useTable,
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
@@ -18,7 +17,7 @@ import {
   useUpdateDocument,
   useDeleteDocument,
 } from '@/api/hooks';
-import { DataTable } from '@/components/ui/data-table';
+import { DataTable, dataTableFeatures } from '@/components/ui/data-table';
 import { SearchInput } from '@/components/ui/search-input';
 import { Pagination } from '@/components/ui/pagination';
 import { ModelForm } from '@/components/ui/model-form';
@@ -33,11 +32,16 @@ import {
 } from '@/components/ui/dialog';
 
 type Doc = Record<string, unknown>;
-const col = createColumnHelper<Doc>();
+const col = createColumnHelper<typeof dataTableFeatures, Doc>();
 
 export default function ModelPage() {
-  const params = useParams<{ model: string }>();
-  const model = params.model;
+  const { model } = useParams<{ model: string }>();
+  // Keyed by model so switching models remounts the view, resetting all
+  // per-model state (page, search, sorting, open dialogs).
+  return <ModelView key={model} model={model} />;
+}
+
+function ModelView({ model }: { model: string }) {
   const { isAdmin, isOwner } = useAuth();
   const { data: models } = useModels();
   const modelDef = models?.find((m) => m.name === model);
@@ -49,18 +53,11 @@ export default function ModelPage() {
   const [editDoc, setEditDoc] = useState<Doc | null>(null);
   const [deleteDoc, setDeleteDoc] = useState<Doc | null>(null);
 
-  useEffect(() => {
+  // Stable identity: SearchInput's debounce effect depends on onChange.
+  const handleSearch = useCallback((value: string) => {
+    setSearch(value);
     setPage(1);
-    setSearch('');
-    setSorting([]);
-    setCreateOpen(false);
-    setEditDoc(null);
-    setDeleteDoc(null);
-  }, [model]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
+  }, []);
 
   const sortField = sorting[0]?.id ?? 'createdAt';
   const sortOrder = sorting[0]?.desc === false ? 'asc' : 'desc';
@@ -84,7 +81,7 @@ export default function ModelPage() {
   const columns = useMemo(() => {
     if (!modelDef) return [];
 
-    const cols: ColumnDef<Doc, unknown>[] = modelDef.fields
+    const cols: ColumnDef<typeof dataTableFeatures, Doc>[] = modelDef.fields
       .filter((f) => f.name !== '__v')
       .slice(0, 6)
       .map((f) =>
@@ -135,12 +132,12 @@ export default function ModelPage() {
     return cols;
   }, [modelDef, canWrite]);
 
-  const table = useReactTable({
+  const table = useTable({
+    features: dataTableFeatures,
     data: data?.docs ?? [],
     columns,
     state: { sorting },
     onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
     manualSorting: true,
   });
 
@@ -156,7 +153,7 @@ export default function ModelPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold capitalize">{model}</h1>
         <div className="flex gap-3 items-center">
-          <SearchInput value={search} onChange={setSearch} />
+          <SearchInput value={search} onChange={handleSearch} />
           {canWrite && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               Create
