@@ -11,8 +11,8 @@ export default [
       '**/.*',
       '**/node_modules/**',
       '**/dist/**',
-      // The dashboard is a Next.js app that owns its own linting (Next/React
-      // plugins). Linting it from the root config errors on unknown rules.
+      // The dashboard has its own ESLint config and ESLint 9 install (Next's
+      // plugins don't support ESLint 10 yet); `pnpm lint:all` lints it.
       'dashboard/**',
       '**/logs/**',
       '**/*.log',

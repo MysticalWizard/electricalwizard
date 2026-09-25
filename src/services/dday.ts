@@ -182,7 +182,8 @@ export async function getDueDDayNotifications(): Promise<IDDay[]> {
 }
 
 /**
- * Process completed D-Days - mark as completed and return those needing notification
+ * Process D-Days whose target date has passed. Recurring ones roll forward a
+ * year; others are marked completed and returned if not yet notified.
  */
 export async function processCompletedDDays(): Promise<IDDay[]> {
   const now = new Date();

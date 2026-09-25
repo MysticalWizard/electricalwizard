@@ -19,13 +19,13 @@ A Discord bot secretary for a small private server with friends — the n-th cir
 - pnpm monorepo: the bot, the web dashboard, and a shared types package
 - Strict TypeScript with ESM
 - Clear separation between Discord I/O and business logic
-- Services are framework-agnostic and testable in isolation
+- Services hold the business logic; only the scheduler talks to Discord directly
 - MongoDB schema design favors per-guild isolation
-- The dashboard talks to an Express API served by the bot process (REST + SSE)
+- The dashboard talks to a Hono API (REST + SSE) that runs as its own process, separate from the bot
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) v18+
+- [Node.js](https://nodejs.org/) v24.14+ (required for `#/` subpath imports)
 - [pnpm](https://pnpm.io/)
 - [MongoDB](https://www.mongodb.com/)
 - A [Discord application](https://discord.com/developers/applications) with a bot token
@@ -72,7 +72,7 @@ A Discord bot secretary for a small private server with friends — the n-th cir
    DISCORD_CLIENT_SECRET=YOUR_DISCORD_CLIENT_SECRET
    WEB_PORT=7611
    WEB_SESSION_SECRET=YOUR_SESSION_SECRET_32_CHARS_MIN
-   WEB_BASE_URL=http://localhost:3000
+   WEB_BASE_URL=http://localhost:8450
    ```
 
    > This project assumes a locally running MongoDB instance by default.
@@ -80,6 +80,9 @@ A Discord bot secretary for a small private server with friends — the n-th cir
    >
    > The translation feature requires `TRANSLATION_API_KEY`. The dashboard's
    > Discord OAuth login requires `DISCORD_CLIENT_SECRET` and a session secret.
+   > `WEB_BASE_URL` is the address you open the dashboard at: add
+   > `<WEB_BASE_URL>/auth/callback` as an OAuth2 redirect in the Discord
+   > developer portal, and the API only accepts changes from that origin.
 
 4. **Deploy slash commands**
 
@@ -98,29 +101,32 @@ A Discord bot secretary for a small private server with friends — the n-th cir
    pnpm dev:all        # bot + dashboard together
 
    # Production
-   pnpm build:all      # build bot + dashboard (or `pnpm build` for bot only)
-   pnpm start          # start the bot (serves the dashboard API)
+   pnpm build:all      # build bot, API and dashboard (or `pnpm build` for bot + API)
+   pnpm start          # start the bot
    ```
 
-   > The bot exposes the dashboard API on `WEB_PORT`; the Next.js dashboard
-   > runs separately (default `http://localhost:3000`).
+   > The dashboard API is its own process (`src/web/index.ts`, built to
+   > `dist/web/index.js`) listening on `WEB_PORT`. No pnpm script starts it on
+   > its own; PM2 runs it alongside the bot and dashboard (see below). The
+   > Next.js dashboard runs on port 8450 and proxies `/api` and `/auth` to
+   > `http://localhost:7611`, so keep `WEB_PORT=7611` unless you also change
+   > `dashboard/next.config.ts`.
 
 ## Production Deployment
 
-The bot includes [PM2](https://pm2.keymetrics.io/) scripts for process management:
+The bot includes [PM2](https://pm2.keymetrics.io/) scripts for process management. `ecosystem.config.cjs` defines three processes: the bot, the dashboard API, and the dashboard.
 
 ```sh
-pnpm pm2:start      # Start the bot
-pnpm pm2:watch      # Start with file watching
-pnpm pm2:stop       # Stop the bot
-pnpm pm2:restart    # Restart the bot
+pnpm pm2:start      # Start all three processes
+pnpm pm2:stop       # Stop them
+pnpm pm2:restart    # Restart them
 pnpm pm2:logs       # View logs
-pnpm pm2:delete     # Remove from PM2
+pnpm pm2:delete     # Remove them from PM2
 ```
 
 > These scripts are intended for simple single-instance deployments.
 
-Make sure to run `pnpm build` before using PM2 commands.
+Make sure to run `pnpm build:all` before using PM2 commands.
 
 ## Project Structure
 
@@ -131,7 +137,7 @@ src/
   models/        # Mongoose schemas (User, Guild, Quote...)
   services/      # Business logic (database, nickname, scheduler, translation...)
   utils/         # Shared utilities (autocomplete, embeds, loaders...)
-  web/           # Express dashboard API (routes, auth/session, SSE event bus)
+  web/           # Hono dashboard API, run as its own process (routes, auth/session, SSE)
   config.ts      # Environment configuration
   deploy.ts      # Command registration script
   main.ts        # Bot entry point
@@ -146,7 +152,7 @@ packages/
 ## Development
 
 ```sh
-pnpm lint        # Run ESLint (bot)
+pnpm lint        # Run ESLint (bot + API)
 pnpm lint:fix    # Fix lint issues
 pnpm lint:all    # Lint bot + dashboard
 pnpm format      # Format with Prettier
@@ -154,6 +160,8 @@ pnpm format:check # Check formatting
 ```
 
 A pre-commit hook (via [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged)) automatically lints and formats staged files.
+
+Internal imports use Node [subpath imports](https://nodejs.org/api/packages.html#subpath-imports) (`#/services/...`), defined in `package.json`. They resolve to `src/` under the `development` condition and to `dist/` otherwise. The `pnpm` dev scripts pass `--conditions=development`; add it yourself if you run `tsx` directly, or imports will load the compiled code in `dist/`.
 
 ## Required Gateway Intents
 
@@ -167,9 +175,10 @@ When inviting the bot to a server, it needs the following [gateway intents](http
 ## Tech Stack
 
 - **Runtime**: Node.js with ESM modules
-- **Language**: TypeScript (strict mode)
+- **Language**: TypeScript 7 (strict mode)
 - **Discord Library**: [discord.js](https://discord.js.org/) v14
 - **Database**: MongoDB via [Mongoose](https://mongoosejs.com/)
+- **Dashboard API**: [Hono](https://hono.dev/)
 - **Date Handling**: [Day.js](https://day.js.org/)
 - **Dashboard**: [Next.js](https://nextjs.org/) 16 + [React](https://react.dev/) 19, [TanStack Query/Table](https://tanstack.com/), [Recharts](https://recharts.org/), [Radix UI](https://www.radix-ui.com/)
 - **Monorepo**: pnpm workspaces

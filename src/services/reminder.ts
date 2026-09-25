@@ -64,7 +64,8 @@ export async function cancelReminder(
 }
 
 /**
- * Get all due reminders (triggerAt <= now) and delete them atomically
+ * Get all due reminders (triggerAt <= now) and delete them. The find and
+ * delete are separate queries, so this assumes a single scheduler instance.
  */
 export async function getDueReminders(): Promise<IReminder[]> {
   const now = new Date();
