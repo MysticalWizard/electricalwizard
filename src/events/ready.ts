@@ -18,7 +18,7 @@ export const event: Event<Events.ClientReady> = {
     const botConfig = await Bot.findOneAndUpdate(
       { clientId: config.clientId },
       { $setOnInsert: { clientId: config.clientId } },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: 'after' },
     );
 
     client.user.setPresence({

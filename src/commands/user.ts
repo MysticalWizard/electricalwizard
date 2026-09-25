@@ -143,7 +143,7 @@ async function handleSet(
   const updatedUser = await User.findOneAndUpdate(
     { discordId: user.id },
     { $set: { ...update, isBot: user.bot }, username: user.username },
-    { new: true, upsert: true },
+    { returnDocument: 'after', upsert: true },
   );
 
   const embed = createEmbed()

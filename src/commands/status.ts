@@ -85,7 +85,7 @@ export const command: SlashCommand = {
     const botConfig = await Bot.findOneAndUpdate(
       { clientId: config.clientId },
       update,
-      { new: true, upsert: true },
+      { returnDocument: 'after', upsert: true },
     );
 
     interaction.client.user.setPresence({

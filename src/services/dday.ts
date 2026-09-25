@@ -114,7 +114,7 @@ export async function updateDDayReminder(
   return DDay.findOneAndUpdate(
     { _id: ddayId, userId },
     { $set: update },
-    { new: true },
+    { returnDocument: 'after' },
   ).lean();
 }
 

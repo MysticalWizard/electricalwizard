@@ -67,7 +67,7 @@ quoteSchema.pre('save', async function () {
     const counter = await Counter.findByIdAndUpdate(
       `quote_${this.guildId}`,
       { $inc: { seq: 1 } },
-      { new: true, upsert: true },
+      { returnDocument: 'after', upsert: true },
     );
     this.quoteNumber = counter.seq;
   }

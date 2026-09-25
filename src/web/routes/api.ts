@@ -300,7 +300,7 @@ api.put('/:model/:id', async (c) => {
 
   const filtered = filterFields(modelName, body);
   const doc = await def.model.findByIdAndUpdate(c.req.param('id'), filtered, {
-    new: true,
+    returnDocument: 'after',
   });
   if (!doc) return c.json({ error: 'Not found' }, 404);
 
