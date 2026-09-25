@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Export every collection to <dir>/<timestamp>/<collection>.json as
-# pretty-printed Extended JSON with mongoexport. Connection settings come
-# from .env (see scripts/lib/mongo.sh).
+# Export every collection as pretty-printed Extended JSON with mongoexport,
+# archived as <dir>/<db>_<timestamp>.tar.gz (one <collection>.json per
+# collection). Connection settings come from .env (see scripts/lib/mongo.sh).
 #
 #   EXPORT_DIR  output directory (default: <repo>/exports)
 #
@@ -12,7 +12,9 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/mongo.sh"
 require_cmd mongosh mongoexport
 
-out="${EXPORT_DIR:-$root/exports}/$(date +%Y%m%d_%H%M%S)"
+dir="${EXPORT_DIR:-$root/exports}"
+name="${db}_$(date +%Y%m%d_%H%M%S)"
+out="$dir/$name"
 
 # Skips the internal change feed (src/services/changeFeed.ts) and system
 # collections. Credentials are read from the environment, not argv.
@@ -33,9 +35,14 @@ if [[ -z "$collections" ]]; then
 fi
 
 mkdir -p "$out"
-while IFS= read -r name; do
-  mongoexport --uri "mongodb://$host/$db" --collection "$name" \
-    --jsonArray --pretty --out "$out/$name.json" "${auth_args[@]}"
+while IFS= read -r coll; do
+  if ! mongoexport --uri "mongodb://$host/$db" --collection "$coll" \
+    --jsonArray --pretty --out "$out/$coll.json" "${auth_args[@]}"; then
+    rm -rf "$out"
+    exit 1
+  fi
 done <<< "$collections"
 
-echo "Exported to $out"
+tar -czf "$out.tar.gz" -C "$dir" "$name"
+rm -rf "$out"
+echo "Exported to $out.tar.gz ($(du -h "$out.tar.gz" | cut -f1))"

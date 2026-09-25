@@ -26,7 +26,7 @@ db="${MONGODB_DB:-electricalwizard}"
 require_cmd() {
   for cmd in "$@"; do
     if ! command -v "$cmd" >/dev/null; then
-      echo "$cmd not found; install MongoDB Database Tools / mongosh" >&2
+      echo "$cmd not found; install it first" >&2
       exit 1
     fi
   done
