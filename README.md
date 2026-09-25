@@ -88,7 +88,8 @@ A Discord bot secretary for a small private server with friends — the n-th cir
 4. **Deploy slash commands**
 
    ```sh
-   pnpm deploy
+   pnpm build && pnpm deploy   # production (runs the compiled dist/deploy.js)
+   pnpm deploy:dev             # development (runs src/ directly, no build needed)
    ```
 
    > This registers all slash commands with Discord. Commands marked as global are available everywhere; guild commands are registered to `GUILD_ID`.
