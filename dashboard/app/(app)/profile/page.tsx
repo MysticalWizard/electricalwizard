@@ -6,20 +6,19 @@ import { useDocuments } from '@/api/hooks';
 function Section({
   title,
   model,
-  userId,
   renderItem,
 }: {
   title: string;
   model: string;
-  userId: string;
   renderItem: (doc: Record<string, unknown>) => string;
 }) {
-  const { data } = useDocuments(model, { limit: 50, page: 1, search: '' });
-  const items =
-    data?.docs.filter(
-      (d) =>
-        d.userId === userId || d.addedById === userId || d.discordId === userId,
-    ) ?? [];
+  const { data } = useDocuments(model, {
+    limit: 50,
+    page: 1,
+    search: '',
+    mine: 'true',
+  });
+  const items = data?.docs ?? [];
 
   if (items.length === 0) return null;
 
@@ -66,7 +65,6 @@ export default function ProfilePage() {
         <Section
           title="My Reminders"
           model="reminders"
-          userId={user.userId}
           renderItem={(d) =>
             `${d.message} - ${new Date(d.triggerAt as string).toLocaleString()}`
           }
@@ -74,7 +72,6 @@ export default function ProfilePage() {
         <Section
           title="My D-Days"
           model="ddays"
-          userId={user.userId}
           renderItem={(d) =>
             `${d.title} - ${new Date(d.targetDate as string).toLocaleDateString()}`
           }
@@ -82,13 +79,11 @@ export default function ProfilePage() {
         <Section
           title="Quotes I Added"
           model="quotes"
-          userId={user.userId}
           renderItem={(d) => `#${d.quoteNumber} "${d.content}"`}
         />
         <Section
           title="My Nicknames"
           model="nicknames"
-          userId={user.userId}
           renderItem={(d) => String(d.nickname)}
         />
       </div>

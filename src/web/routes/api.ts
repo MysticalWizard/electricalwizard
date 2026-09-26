@@ -217,9 +217,10 @@ api.get('/:model', async (c) => {
 
   const query: Record<string, unknown> = {};
 
-  // Privacy filtering
-  if (def.hasPrivacy && def.ownerField) {
-    if (session.role !== 'admin' && session.role !== 'owner') {
+  // Privacy filtering, or the caller's own records when asked for
+  if (def.ownerField) {
+    const isPrivileged = session.role === 'admin' || session.role === 'owner';
+    if ((def.hasPrivacy && !isPrivileged) || c.req.query('mine') === 'true') {
       query[def.ownerField] = session.userId;
     }
   }

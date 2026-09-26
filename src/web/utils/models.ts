@@ -19,6 +19,10 @@ export interface ModelDef {
   model: Model<unknown>;
   fields: FieldDef[];
   hasPrivacy?: boolean;
+  /**
+   * Field holding the Discord ID of the user a record belongs to. Used for
+   * `?mine=true` lists, and for privacy checks when `hasPrivacy` is set.
+   */
   ownerField?: string;
   ownerOnly?: boolean;
   readOnly?: boolean;
@@ -118,6 +122,7 @@ export const modelRegistry: Record<string, ModelDef> = {
   },
   quotes: {
     model: Quote as unknown as Model<unknown>,
+    ownerField: 'addedById',
     fields: [
       { name: '_id', type: 'string', readOnly: true },
       { name: 'guildId', type: 'string', required: true },
@@ -135,6 +140,7 @@ export const modelRegistry: Record<string, ModelDef> = {
   },
   nicknames: {
     model: Nickname as unknown as Model<unknown>,
+    ownerField: 'userId',
     fields: [
       { name: '_id', type: 'string', readOnly: true },
       { name: 'guildId', type: 'string', required: true },
