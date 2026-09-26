@@ -23,6 +23,7 @@ export function useSSE() {
       timer = null;
       for (const model of changedModels) {
         qc.invalidateQueries({ queryKey: ['documents', model] });
+        qc.invalidateQueries({ queryKey: ['analytics', model] });
       }
       changedModels.clear();
       qc.invalidateQueries({ queryKey: ['stats'] });
