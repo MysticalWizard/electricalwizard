@@ -1,6 +1,5 @@
 'use client';
 
-import { AppShell } from '@/components/layout/app-shell';
 import { StatCard } from '@/components/ui/stat-card';
 import { useStats, useActivity } from '@/api/hooks';
 
@@ -9,7 +8,7 @@ export default function DashboardPage() {
   const { data: activity } = useActivity();
 
   return (
-    <AppShell>
+    <>
       <h1 className="text-xl font-bold mb-4">Dashboard</h1>
 
       {stats && (
@@ -59,6 +58,6 @@ export default function DashboardPage() {
           );
         })}
       </div>
-    </AppShell>
+    </>
   );
 }

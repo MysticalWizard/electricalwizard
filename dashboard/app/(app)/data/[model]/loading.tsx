@@ -1,6 +1,6 @@
 export default function ModelLoading() {
   return (
-    <div className="p-6">
+    <div>
       <div className="flex items-center justify-between mb-4">
         <div className="h-7 w-32 bg-surface-alt rounded animate-pulse" />
         <div className="flex gap-3">

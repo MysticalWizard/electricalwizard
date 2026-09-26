@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { AppShell } from '@/components/layout/app-shell';
 import { useModels, useAnalytics, useStats } from '@/api/hooks';
 import { DateRangeFilter } from '@/components/charts/date-range-filter';
 import { LineChart } from '@/components/charts/line-chart';
@@ -33,7 +32,7 @@ export default function AnalyticsPage() {
     : [];
 
   return (
-    <AppShell>
+    <>
       <h1 className="text-xl font-bold mb-4">Analytics</h1>
 
       <div className="flex gap-4 items-center mb-4 flex-wrap">
@@ -66,6 +65,6 @@ export default function AnalyticsPage() {
         <BarChart data={analytics ?? []} title={`Count by ${groupBy}`} />
         <PieChart data={pieData} title="Data Distribution" />
       </div>
-    </AppShell>
+    </>
   );
 }

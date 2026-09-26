@@ -1,6 +1,5 @@
 'use client';
 
-import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/hooks/use-auth';
 import { useDocuments } from '@/api/hooks';
 
@@ -51,7 +50,7 @@ export default function ProfilePage() {
     : `https://cdn.discordapp.com/embed/avatars/${Number(BigInt(user.userId) >> 22n) % 6}.png`;
 
   return (
-    <AppShell>
+    <>
       <div className="flex items-center gap-4 mb-6">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full" />
@@ -93,6 +92,6 @@ export default function ProfilePage() {
           renderItem={(d) => String(d.nickname)}
         />
       </div>
-    </AppShell>
+    </>
   );
 }

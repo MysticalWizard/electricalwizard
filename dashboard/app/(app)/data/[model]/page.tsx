@@ -8,7 +8,6 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { AppShell } from '@/components/layout/app-shell';
 import { useAuth } from '@/hooks/use-auth';
 import {
   useModels,
@@ -143,15 +142,10 @@ function ModelView({ model }: { model: string }) {
     manualSorting: true,
   });
 
-  if (!modelDef)
-    return (
-      <AppShell>
-        <div className="text-muted-foreground">Loading...</div>
-      </AppShell>
-    );
+  if (!modelDef) return <div className="text-muted-foreground">Loading...</div>;
 
   return (
-    <AppShell>
+    <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold capitalize">{model}</h1>
         <div className="flex gap-3 items-center">
@@ -256,6 +250,6 @@ function ModelView({ model }: { model: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </AppShell>
+    </>
   );
 }
