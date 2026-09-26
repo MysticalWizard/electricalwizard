@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -101,7 +102,7 @@ async function handleAdd(
   if (duplicate) {
     await interaction.reply({
       content: `This quote already exists as #${duplicate.quoteNumber}.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -137,7 +138,7 @@ async function handleGet(
     if (!quote) {
       await interaction.reply({
         content: `Quote #${id} not found.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -155,7 +156,7 @@ async function handleGet(
   if (quotes.length === 0) {
     await interaction.reply({
       content: 'No quotes found matching your criteria.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -176,7 +177,7 @@ async function handleRandom(
   if (quotes.length === 0) {
     await interaction.reply({
       content: 'No quotes found in this server.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -197,7 +198,7 @@ async function handleDelete(
   if (!quote) {
     await interaction.reply({
       content: `Quote #${id} not found.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -206,7 +207,7 @@ async function handleDelete(
     await interaction.reply({
       content:
         'You can only delete quotes you created or quotes about yourself.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -237,7 +238,7 @@ async function handleDelete(
   const response = await interaction.reply({
     embeds: [embed],
     components: [row],
-    ephemeral: true,
+    flags: MessageFlags.Ephemeral,
   });
 
   try {

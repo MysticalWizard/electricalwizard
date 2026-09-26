@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   SlashCommandBuilder,
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
@@ -135,7 +136,7 @@ async function handleNew(
         'Invalid time format. Examples:\n' +
         '- Relative: `1h`, `30m`, `2d`, `1h30m`, `13hr 43m`\n' +
         '- Absolute: `2026-03-29`, `2026-03-29 14:30`',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -144,7 +145,7 @@ async function handleNew(
   if (parsed.date <= new Date()) {
     await interaction.reply({
       content: 'The reminder time must be in the future.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -177,7 +178,7 @@ async function handleNew(
     )
     .setFooter({ text: `ID: ${reminder._id}` });
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleList(
@@ -191,7 +192,7 @@ async function handleList(
   if (reminders.length === 0) {
     await interaction.reply({
       content: 'You have no active reminders.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -211,7 +212,7 @@ async function handleList(
         .join('\n\n'),
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleCancel(
@@ -224,7 +225,7 @@ async function handleCancel(
   if (!cancelled) {
     await interaction.reply({
       content: 'Reminder not found or you do not have permission to cancel it.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -234,7 +235,7 @@ async function handleCancel(
     .setColor(colors.success)
     .setDescription('Your reminder has been cancelled.');
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleReminderAutocomplete(

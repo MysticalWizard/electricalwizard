@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   PermissionFlagsBits,
   type ChatInputCommandInteraction,
   type GuildMember,
@@ -15,7 +16,7 @@ export async function requireGuild(
   if (!interaction.guild) {
     await interaction.reply({
       content: 'This command can only be used in a server.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return false;
   }

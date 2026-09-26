@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   SlashCommandBuilder,
   PermissionFlagsBits,
   type AutocompleteInteraction,
@@ -88,7 +89,7 @@ async function handleSet(
     await interaction.reply({
       content:
         "You need Administrator permission to change other users' timezones.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -96,7 +97,7 @@ async function handleSet(
   if (!isValidTimezone(timezone)) {
     await interaction.reply({
       content: `Invalid timezone: \`${timezone}\`. Use a valid IANA timezone like \`America/New_York\`.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -126,7 +127,7 @@ async function handleSet(
     { name: 'Current Time', value: currentTime, inline: true },
   );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleGet(
@@ -142,7 +143,7 @@ async function handleGet(
       content: isSelf
         ? 'You have not set a timezone. Use `/timezone set` to set one.'
         : `${targetUser} has not set a timezone.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -158,5 +159,5 @@ async function handleGet(
       { name: 'Current Time', value: currentTime, inline: true },
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }

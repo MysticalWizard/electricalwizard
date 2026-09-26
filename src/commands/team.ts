@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import type { ChatInputCommandInteraction } from 'discord.js';
 import type { SlashCommand } from '#/types.js';
 
@@ -42,7 +42,7 @@ export const command: SlashCommand = {
     if (players.length < teamCount) {
       await interaction.reply({
         content: `Not enough players (${players.length}) for ${teamCount} teams.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }

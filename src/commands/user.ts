@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   SlashCommandBuilder,
   PermissionFlagsBits,
   type AutocompleteInteraction,
@@ -109,7 +110,7 @@ async function handleSet(
       if (isNaN(birthday.getTime())) {
         await interaction.reply({
           content: 'Invalid date format. Use YYYY-MM-DD.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -135,7 +136,7 @@ async function handleSet(
 
     await interaction.reply({
       content: `${user} ${existing ? 'updated' : 'added to database'}.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -173,7 +174,7 @@ async function handleSet(
       },
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleGet(
@@ -186,7 +187,7 @@ async function handleGet(
   if (!dbUser) {
     await interaction.reply({
       content: `${user} has no data stored.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -213,13 +214,13 @@ async function handleGet(
       },
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleList(
   interaction: ChatInputCommandInteraction,
 ): Promise<void> {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const members = await interaction.guild!.members.fetch();
   const memberIds = new Set(members.map((m) => m.id));

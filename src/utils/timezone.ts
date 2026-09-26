@@ -1,3 +1,4 @@
+import { MessageFlags } from 'discord.js';
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { User } from '#/models/User.js';
 
@@ -33,7 +34,7 @@ export async function validateTimezone(
   if (!isValidTimezone(timezone)) {
     await interaction.reply({
       content: `Invalid timezone: \`${timezone}\`. Use a valid IANA timezone like \`America/New_York\`.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return false;
   }

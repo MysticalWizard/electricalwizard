@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   SlashCommandBuilder,
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
@@ -186,7 +187,7 @@ async function handleNew(
         '- `2022-11-13`\n' +
         '- `2022-11-13 14:30`\n' +
         '- `11/13/2022`',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -238,7 +239,7 @@ async function handleNew(
     )
     .setFooter({ text: `ID: ${dday._id}` });
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleList(
@@ -249,7 +250,7 @@ async function handleList(
   if (ddays.length === 0) {
     await interaction.reply({
       content: 'You have no D-Day countdowns.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -270,7 +271,7 @@ async function handleList(
         .join('\n\n'),
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleDelete(
@@ -283,7 +284,7 @@ async function handleDelete(
   if (!deleted) {
     await interaction.reply({
       content: 'D-Day not found or you do not have permission to delete it.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -293,7 +294,7 @@ async function handleDelete(
     .setColor(colors.success)
     .setDescription('Your D-Day countdown has been deleted.');
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleRemind(
@@ -314,7 +315,7 @@ async function handleRemind(
   if (!updated) {
     await interaction.reply({
       content: 'D-Day not found or you do not have permission to update it.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -330,7 +331,7 @@ async function handleRemind(
       `**${updated.title}**\nReminder frequency: ${frequencyDisplay}`,
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleDDayAutocomplete(

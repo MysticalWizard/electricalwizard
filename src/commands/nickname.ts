@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   SlashCommandBuilder,
   PermissionFlagsBits,
   type AutocompleteInteraction,
@@ -136,7 +137,7 @@ async function handleAdd(
   if (user.id !== interaction.user.id && !isAdmin(member)) {
     await interaction.reply({
       content: 'You can only add nicknames for yourself.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -150,7 +151,7 @@ async function handleAdd(
     await interaction.reply({
       content:
         'No valid nicknames provided. Each nickname must be 1-32 characters.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -171,7 +172,7 @@ async function handleAdd(
   if (added.length === 0) {
     await interaction.reply({
       content: `All nicknames are already in use: ${skipped.map((n) => `**${n}**`).join(', ')}`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -190,7 +191,7 @@ async function handleAdd(
     });
   }
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleRemove(
@@ -205,7 +206,7 @@ async function handleRemove(
   if (!ownerId) {
     await interaction.reply({
       content: `No nickname **${nickname}** found.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -214,7 +215,7 @@ async function handleRemove(
   if (ownerId !== interaction.user.id && !isAdmin(member)) {
     await interaction.reply({
       content: 'You can only remove your own nicknames.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -226,7 +227,7 @@ async function handleRemove(
     .setColor(colors.success)
     .setDescription(`Removed nickname **${nickname}** from <@${ownerId}>.`);
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function handleList(
@@ -241,7 +242,7 @@ async function handleList(
     if (nicknames.length === 0) {
       await interaction.reply({
         content: `${user} has no nicknames.`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -250,14 +251,17 @@ async function handleList(
       .setTitle(`Nicknames for ${user.username}`)
       .setDescription(nicknames.map((n) => `- ${n.nickname}`).join('\n'));
 
-    await interaction.reply({ embeds: [embed], ephemeral });
+    await interaction.reply({
+      embeds: [embed],
+      ...(ephemeral && { flags: MessageFlags.Ephemeral }),
+    });
   } else {
     const nicknames = await getGuildNicknames(interaction.guild!.id);
 
     if (nicknames.length === 0) {
       await interaction.reply({
         content: 'No nicknames have been added yet.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -279,7 +283,10 @@ async function handleList(
       .setTitle('Server Nicknames')
       .setDescription(lines.join('\n'));
 
-    await interaction.reply({ embeds: [embed], ephemeral });
+    await interaction.reply({
+      embeds: [embed],
+      ...(ephemeral && { flags: MessageFlags.Ephemeral }),
+    });
   }
 }
 
@@ -294,7 +301,7 @@ async function handleToggle(
     if (!isAdmin(member)) {
       await interaction.reply({
         content: 'Only administrators can toggle global announcements.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -308,7 +315,7 @@ async function handleToggle(
         `Global nickname announcements have been turned **${enabled ? 'on' : 'off'}**.`,
       );
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -324,5 +331,5 @@ async function handleToggle(
       `Your nickname announcements have been turned **${newState ? 'on' : 'off'}**.`,
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }

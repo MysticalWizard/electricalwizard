@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   SlashCommandBuilder,
   PermissionFlagsBits,
   type ChatInputCommandInteraction,
@@ -42,7 +43,7 @@ export const command: SlashCommand = {
           content: isSelf
             ? "You haven't set your birthday yet."
             : `${targetUser} hasn't set their birthday.`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -53,7 +54,10 @@ export const command: SlashCommand = {
           : `${targetUser}'s birthday is **${formatBirthday(birthday)}**.`,
       );
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({
+        embeds: [embed],
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 
@@ -61,7 +65,7 @@ export const command: SlashCommand = {
     if (!isSelf && !isAdmin) {
       await interaction.reply({
         content: 'You can only set your own birthday.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -70,7 +74,7 @@ export const command: SlashCommand = {
     if (!parsed) {
       await interaction.reply({
         content: 'Invalid date. Use MM/DD/YYYY format (e.g., 12/25/1990).',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -85,6 +89,6 @@ export const command: SlashCommand = {
           : `${targetUser}'s birthday has been set to **${formatBirthday(parsed)}**.`,
       );
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

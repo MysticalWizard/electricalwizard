@@ -1,4 +1,4 @@
-import { Events } from 'discord.js';
+import { Events, MessageFlags, type InteractionReplyOptions } from 'discord.js';
 import type { Event } from '#/types.js';
 
 export const event: Event<Events.InteractionCreate> = {
@@ -39,9 +39,9 @@ export const event: Event<Events.InteractionCreate> = {
     } catch (error) {
       console.error(`Error executing ${interaction.commandName}:`, error);
 
-      const errorMessage = {
+      const errorMessage: InteractionReplyOptions = {
         content: 'There was an error while executing this command!',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       };
 
       if (interaction.replied || interaction.deferred) {
