@@ -1,4 +1,5 @@
 import { DDay, type IDDay, type ReminderFrequency } from '#/models/DDay.js';
+import { escapeRegex } from '#/utils/regex.js';
 
 export interface CreateDDayData {
   guildId: string;
@@ -128,26 +129,20 @@ export async function getDDaysForAutocomplete(
 ): Promise<
   Array<{ id: string; title: string; targetDate: Date; completed: boolean }>
 > {
-  const ddays = await DDay.find({ guildId, userId })
-    .sort({ targetDate: 1 })
-    .limit(25)
-    .lean();
+  // Filter in the query so matches beyond the first 25 D-Days are found
+  const query: Record<string, unknown> = { guildId, userId };
+  if (filter) {
+    query.title = { $regex: escapeRegex(filter), $options: 'i' };
+  }
 
-  let results = ddays.map((d) => ({
+  const ddays = await DDay.find(query).sort({ targetDate: 1 }).limit(25).lean();
+
+  return ddays.map((d) => ({
     id: d._id.toString(),
     title: d.title,
     targetDate: d.targetDate,
     completed: d.completed,
   }));
-
-  if (filter) {
-    const lowerFilter = filter.toLowerCase();
-    results = results.filter((d) =>
-      d.title.toLowerCase().includes(lowerFilter),
-    );
-  }
-
-  return results.slice(0, 25);
 }
 
 /**

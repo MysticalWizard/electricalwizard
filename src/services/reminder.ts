@@ -1,5 +1,6 @@
 import { Reminder, type IReminder } from '#/models/Reminder.js';
 import { User } from '#/models/User.js';
+import { escapeRegex } from '#/utils/regex.js';
 
 export interface CreateReminderData {
   guildId: string;
@@ -102,25 +103,20 @@ export async function getRemindersForAutocomplete(
   userId: string,
   filter?: string,
 ): Promise<Array<{ id: string; message: string; triggerAt: Date }>> {
+  // Filter in the query so matches beyond the first 25 reminders are found
   const query: Record<string, unknown> = { guildId, userId };
+  if (filter) {
+    query.message = { $regex: escapeRegex(filter), $options: 'i' };
+  }
 
   const reminders = await Reminder.find(query)
     .sort({ triggerAt: 1 })
     .limit(25)
     .lean();
 
-  let results = reminders.map((r) => ({
+  return reminders.map((r) => ({
     id: r._id.toString(),
     message: r.message,
     triggerAt: r.triggerAt,
   }));
-
-  if (filter) {
-    const lowerFilter = filter.toLowerCase();
-    results = results.filter((r) =>
-      r.message.toLowerCase().includes(lowerFilter),
-    );
-  }
-
-  return results.slice(0, 25);
 }
