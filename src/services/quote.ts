@@ -1,4 +1,9 @@
-import { Counter, Quote, type IQuote } from '#/models/Quote.js';
+import {
+  Counter,
+  Quote,
+  quoteContentKey,
+  type IQuote,
+} from '#/models/Quote.js';
 import { User } from '#/models/User.js';
 import { formatNameWithInitials } from '#/utils/formatName.js';
 
@@ -22,10 +27,9 @@ export async function findDuplicateQuote(
   authorId?: string,
   authorName?: string,
 ): Promise<IQuote | null> {
-  const normalizedContent = content.trim().toLowerCase();
-
   const query: Record<string, unknown> = {
     guildId,
+    contentKey: quoteContentKey(content),
   };
 
   if (authorId) {
@@ -39,12 +43,7 @@ export async function findDuplicateQuote(
     };
   }
 
-  const quotes = await Quote.find(query).lean();
-
-  return (
-    quotes.find((q) => q.content.trim().toLowerCase() === normalizedContent) ??
-    null
-  );
+  return Quote.findOne(query).lean();
 }
 
 /**
@@ -215,4 +214,27 @@ export async function getQuoteAuthors(
     { $project: { authorId: '$_id', count: 1, _id: 0 } },
     { $sort: { count: -1 } },
   ]);
+}
+
+/**
+ * Fill in contentKey for quotes saved before it existed. Runs at startup and
+ * does nothing once every quote has one. Writes directly to the collection,
+ * since the field isn't shown on the dashboard.
+ */
+export async function backfillQuoteContentKeys(): Promise<void> {
+  const quotes = await Quote.find(
+    { contentKey: { $exists: false } },
+    { content: 1 },
+  ).lean();
+  if (quotes.length === 0) return;
+
+  await Quote.bulkWrite(
+    quotes.map((q) => ({
+      updateOne: {
+        filter: { _id: q._id },
+        update: { $set: { contentKey: quoteContentKey(q.content) } },
+      },
+    })),
+  );
+  console.log(`Backfilled contentKey for ${quotes.length} quote(s)`);
 }

@@ -9,10 +9,16 @@ const counterSchema = new Schema({
 
 export const Counter = model('Counter', counterSchema);
 
+/** Normalized quote text used to detect duplicates. */
+export function quoteContentKey(content: string): string {
+  return content.trim().toLowerCase();
+}
+
 export interface IQuote extends Document {
   guildId: string;
   quoteNumber: number;
   content: string;
+  contentKey?: string;
   authorId?: string;
   authorName?: string;
   year: number;
@@ -35,6 +41,10 @@ const quoteSchema = new Schema<IQuote>(
     content: {
       type: String,
       required: true,
+    },
+    // Derived from content by the hooks below; not edited directly
+    contentKey: {
+      type: String,
     },
     authorId: {
       type: String,
@@ -73,7 +83,25 @@ quoteSchema.pre('save', async function () {
   }
 });
 
+// Keep contentKey in sync with content on saves and on query updates (the
+// dashboard edits quotes with findByIdAndUpdate)
+quoteSchema.pre('save', function () {
+  if (this.isModified('content')) {
+    this.contentKey = quoteContentKey(this.content);
+  }
+});
+
+quoteSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function () {
+  const update = this.getUpdate();
+  if (!update || Array.isArray(update)) return;
+  const content: unknown = update.$set?.content ?? update.content;
+  if (typeof content === 'string') {
+    this.set('contentKey', quoteContentKey(content));
+  }
+});
+
 quoteSchema.index({ guildId: 1, quoteNumber: 1 }, { unique: true });
+quoteSchema.index({ guildId: 1, contentKey: 1 });
 quoteSchema.index({ guildId: 1, authorId: 1 });
 quoteSchema.index({ guildId: 1, year: 1 });
 
