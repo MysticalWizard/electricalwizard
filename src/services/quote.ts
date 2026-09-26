@@ -193,7 +193,9 @@ export async function getUsersWithNames(): Promise<
         $and: [{ 'name.last': { $ne: null } }, { 'name.last': { $ne: '' } }],
       },
     ],
-  }).lean();
+  })
+    .select({ discordId: 1, name: 1 })
+    .lean();
 
   return users.map((user) => ({
     discordId: user.discordId,

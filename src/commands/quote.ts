@@ -27,25 +27,45 @@ import {
 import {
   formatNameWithInitials,
   formatQuoteDisplay,
-  getFormattedUserName,
 } from '#/utils/formatName.js';
 import { colors, createEmbed } from '#/utils/embeds.js';
 import { requireGuild, isAdmin } from '#/utils/guards.js';
 
-async function formatQuoteForDisplay(quote: IQuote): Promise<string> {
-  let displayName = quote.authorName ?? 'Unknown';
-
-  if (quote.authorId && !quote.authorName) {
-    const result = await getFormattedUserName(quote.authorId, displayName);
-    displayName = result.name;
-  }
-
-  return formatQuoteDisplay(
-    quote.content,
-    displayName,
-    quote.year,
-    quote.context,
+async function formatQuotesForDisplay(quotes: IQuote[]): Promise<string[]> {
+  // Quotes stored with only an author ID take the name from the User model,
+  // looked up in one query for the whole batch.
+  const unnamedIds = [
+    ...new Set(
+      quotes.flatMap((q) => (q.authorId && !q.authorName ? [q.authorId] : [])),
+    ),
+  ];
+  const users = unnamedIds.length
+    ? await User.find(
+        { discordId: { $in: unnamedIds } },
+        { discordId: 1, name: 1 },
+      ).lean()
+    : [];
+  const names = new Map(
+    users
+      .filter((u) => u.name?.first || u.name?.last)
+      .map((u) => [
+        u.discordId,
+        formatNameWithInitials(u.name.first, u.name.last),
+      ]),
   );
+
+  return quotes.map((quote) => {
+    let displayName = quote.authorName ?? 'Unknown';
+    if (quote.authorId && !quote.authorName) {
+      displayName = names.get(quote.authorId) ?? displayName;
+    }
+    return formatQuoteDisplay(
+      quote.content,
+      displayName,
+      quote.year,
+      quote.context,
+    );
+  });
 }
 
 async function handleAdd(
@@ -140,11 +160,7 @@ async function handleGet(
     return;
   }
 
-  const quoteLines = await Promise.all(
-    quotes.map(async (quote) => {
-      return await formatQuoteForDisplay(quote);
-    }),
-  );
+  const quoteLines = await formatQuotesForDisplay(quotes);
 
   await interaction.reply(quoteLines.join('\n\n'));
 }
@@ -165,11 +181,7 @@ async function handleRandom(
     return;
   }
 
-  const quoteLines = await Promise.all(
-    quotes.map(async (quote) => {
-      return await formatQuoteForDisplay(quote);
-    }),
-  );
+  const quoteLines = await formatQuotesForDisplay(quotes);
 
   await interaction.reply(quoteLines.join('\n\n'));
 }
@@ -199,7 +211,7 @@ async function handleDelete(
     return;
   }
 
-  const formatted = await formatQuoteForDisplay(quote);
+  const [formatted] = await formatQuotesForDisplay([quote]);
 
   const embed = createEmbed()
     .setTitle('Delete Quote?')
@@ -394,12 +406,17 @@ export const command: SlashCommand = {
         if (!interaction.guild) return;
 
         const authors = await getQuoteAuthors(interaction.guild.id);
+        const users = await User.find(
+          { discordId: { $in: authors.map((a) => a.authorId) } },
+          { discordId: 1, username: 1, name: 1 },
+        ).lean();
+        const usersById = new Map(users.map((u) => [u.discordId, u]));
 
-        const authorChoices = await Promise.all(
-          authors.slice(0, 25).map(async (author) => {
-            const user = await User.findOne({
-              discordId: author.authorId,
-            }).lean();
+        // Filter across all authors before capping at Discord's 25 choices
+        const search = focusedOption.value.toLowerCase();
+        const authorChoices = authors
+          .map((author) => {
+            const user = usersById.get(author.authorId);
             const displayName = user?.name?.first
               ? formatNameWithInitials(user.name.first, user.name.last)
               : (user?.username ?? 'Unknown');
@@ -408,14 +425,11 @@ export const command: SlashCommand = {
               name: `${displayName} (${author.count} quote${author.count === 1 ? '' : 's'})`,
               value: author.authorId,
             };
-          }),
-        );
+          })
+          .filter((choice) => choice.name.toLowerCase().includes(search))
+          .slice(0, 25);
 
-        const filtered = authorChoices.filter((choice) =>
-          choice.name.toLowerCase().includes(focusedOption.value.toLowerCase()),
-        );
-
-        await interaction.respond(filtered);
+        await interaction.respond(authorChoices);
       }
     }
   },
