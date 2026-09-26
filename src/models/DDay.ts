@@ -79,7 +79,9 @@ const ddaySchema = new Schema<IDDay>(
 
 ddaySchema.index({ nextNotifyAt: 1 });
 ddaySchema.index({ userId: 1, guildId: 1 });
-ddaySchema.index({ targetDate: 1, completed: 1 });
+// Equality field first so the scheduler's { completed: false, targetDate <= now }
+// poll doesn't scan the ever-growing set of completed D-Days
+ddaySchema.index({ completed: 1, targetDate: 1 });
 
 ddaySchema.plugin(changeFeedPlugin);
 

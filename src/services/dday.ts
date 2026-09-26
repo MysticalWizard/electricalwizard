@@ -202,25 +202,20 @@ export async function processCompletedDDays(): Promise<IDDay[]> {
         { $set: { targetDate: newTargetDate } },
       );
     } else {
-      // For non-recurring D-Days, mark as completed
+      // For non-recurring D-Days, mark as completed and notified
       await DDay.updateOne(
         { _id: dday._id },
         {
           $set: {
             completed: true,
             nextNotifyAt: null,
+            completionNotified: true,
           },
         },
       );
 
       // Add to notification list if not already notified
-      if (!dday.completionNotified) {
-        toNotify.push(dday);
-        await DDay.updateOne(
-          { _id: dday._id },
-          { $set: { completionNotified: true } },
-        );
-      }
+      if (!dday.completionNotified) toNotify.push(dday);
     }
   }
 
