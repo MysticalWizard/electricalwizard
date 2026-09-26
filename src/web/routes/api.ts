@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { DDay } from '#/models/DDay.js';
+import { Reminder } from '#/models/Reminder.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSession, type Session } from '../middleware/session.js';
 import { modelRegistry } from '../utils/models.js';
@@ -66,54 +68,65 @@ api.get('/models', (c) => {
 api.get('/stats', async (c) => {
   const session = getSession(c)!;
   const isPrivileged = session.role === 'admin' || session.role === 'owner';
+  const ownerFilter = isPrivileged ? {} : { userId: session.userId };
+
+  const entries = Object.entries(modelRegistry);
+  const [counts, activeReminders, activeDdays] = await Promise.all([
+    Promise.all(
+      entries.map(([, def]) =>
+        // Privacy filtering — members only count their own records
+        def.hasPrivacy && def.ownerField && !isPrivileged
+          ? def.model.countDocuments({ [def.ownerField]: session.userId })
+          : // Unfiltered totals come from collection metadata instead of a scan
+            def.model.estimatedDocumentCount(),
+      ),
+    ),
+    Reminder.countDocuments({
+      triggerAt: { $gt: new Date() },
+      ...ownerFilter,
+    }),
+    DDay.countDocuments({ completed: false, ...ownerFilter }),
+  ]);
 
   const stats: Record<string, unknown> = {};
-  for (const [name, def] of Object.entries(modelRegistry)) {
-    // Privacy filtering — members only count their own records
-    const filter: Record<string, unknown> = {};
-    if (def.hasPrivacy && def.ownerField && !isPrivileged) {
-      filter[def.ownerField] = session.userId;
-    }
-    stats[name] = await def.model.countDocuments(filter);
-  }
-
-  const { Reminder } = await import('#/models/Reminder.js');
-  const { DDay } = await import('#/models/DDay.js');
-  stats.activeReminders = await Reminder.countDocuments({
-    triggerAt: { $gt: new Date() },
-    ...(isPrivileged ? {} : { userId: session.userId }),
+  entries.forEach(([name], i) => {
+    stats[name] = counts[i];
   });
-  stats.activeDdays = await DDay.countDocuments({
-    completed: false,
-    ...(isPrivileged ? {} : { userId: session.userId }),
-  });
+  stats.activeReminders = activeReminders;
+  stats.activeDdays = activeDdays;
 
   return c.json(stats);
 });
 
+// Only the fields the dashboard's activity feed summarizes
+const ACTIVITY_PROJECTION = {
+  title: 1,
+  content: 1,
+  nickname: 1,
+  username: 1,
+  name: 1,
+  updatedAt: 1,
+};
+
 api.get('/activity', async (c) => {
   const session = getSession(c)!;
-  const items: { model: string; doc: unknown }[] = [];
+  const isPrivileged = session.role === 'admin' || session.role === 'owner';
 
-  for (const [name, def] of Object.entries(modelRegistry)) {
-    const query: Record<string, unknown> = {};
-    if (
-      def.hasPrivacy &&
-      def.ownerField &&
-      session.role !== 'admin' &&
-      session.role !== 'owner'
-    ) {
-      query[def.ownerField] = session.userId;
-    }
-    const docs = await def.model
-      .find(query)
-      .sort({ updatedAt: -1 })
-      .limit(5)
-      .lean();
-    for (const doc of docs) {
-      items.push({ model: name, doc });
-    }
-  }
+  const perModel = await Promise.all(
+    Object.entries(modelRegistry).map(async ([name, def]) => {
+      const query: Record<string, unknown> = {};
+      if (def.hasPrivacy && def.ownerField && !isPrivileged) {
+        query[def.ownerField] = session.userId;
+      }
+      const docs = await def.model
+        .find(query, ACTIVITY_PROJECTION)
+        .sort({ updatedAt: -1 })
+        .limit(5)
+        .lean();
+      return docs.map((doc) => ({ model: name, doc }));
+    }),
+  );
+  const items = perModel.flat();
 
   items.sort((a, b) => {
     const aDate = (a.doc as { updatedAt?: Date }).updatedAt?.getTime() ?? 0;
