@@ -6,6 +6,7 @@ import {
 } from '#/models/Quote.js';
 import { User } from '#/models/User.js';
 import { formatNameWithInitials } from '#/utils/formatName.js';
+import { escapeRegex } from '#/utils/regex.js';
 
 export interface AddQuoteData {
   guildId: string;
@@ -36,10 +37,7 @@ export async function findDuplicateQuote(
     query.authorId = authorId;
   } else if (authorName) {
     query.authorName = {
-      $regex: new RegExp(
-        `^${authorName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-        'i',
-      ),
+      $regex: new RegExp(`^${escapeRegex(authorName)}$`, 'i'),
     };
   }
 

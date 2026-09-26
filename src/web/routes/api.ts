@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { DDay } from '#/models/DDay.js';
 import { Reminder } from '#/models/Reminder.js';
+import { escapeRegex } from '#/utils/regex.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getSession, type Session } from '../middleware/session.js';
 import { modelRegistry } from '../utils/models.js';
@@ -23,10 +24,6 @@ function sanitize(value: unknown): boolean {
     }
   }
   return true;
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function filterFields(

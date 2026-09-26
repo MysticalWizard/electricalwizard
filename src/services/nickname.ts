@@ -1,6 +1,7 @@
 import { Guild } from '#/models/Guild.js';
 import { Nickname, type INickname } from '#/models/Nickname.js';
 import { User } from '#/models/User.js';
+import { escapeRegex } from '#/utils/regex.js';
 
 export interface NicknameMatch {
   nickname: string;
@@ -206,10 +207,6 @@ export async function nicknameExists(
     nickname: { $regex: new RegExp(`^${escapeRegex(nickname)}$`, 'i') },
   });
   return existing !== null;
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
