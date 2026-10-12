@@ -54,12 +54,13 @@ export async function getGuildMember(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  // Not in the guild, or the token was revoked. Other failures (rate limits,
-  // outages) mean membership couldn't be checked, so they throw instead.
-  if (res.status === 401 || res.status === 403 || res.status === 404) {
-    return { isMember: false, isAdmin: false };
+  // Rate limits and server errors mean membership couldn't be checked right
+  // now. Any other error means the token can't see a member of the guild,
+  // because the user left or the token was revoked.
+  if (res.status === 429 || res.status >= 500) {
+    throw new Error(`Failed to fetch guild member: ${res.status}`);
   }
-  if (!res.ok) throw new Error(`Failed to fetch guild member: ${res.status}`);
+  if (!res.ok) return { isMember: false, isAdmin: false };
 
   const data = (await res.json()) as { permissions?: string };
   const perms = BigInt(data.permissions ?? '0');

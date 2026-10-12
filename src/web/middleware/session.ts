@@ -20,6 +20,8 @@ export interface Session {
   accessToken: string;
   /** When membership and role were last confirmed with Discord. */
   checkedAt: number;
+  /** When to re-check them next. */
+  recheckAt: number;
   exp: number;
 }
 
@@ -28,8 +30,10 @@ const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 // Leaving the guild, losing admin or logging out elsewhere (which revokes the
 // token) takes effect within this long.
 const RECHECK_MS = 5 * 60 * 1000;
-// How soon to try again when Discord couldn't be reached
+// When Discord can't be reached, retry this often, and end the session once
+// it has gone this long without a successful check.
 const RETRY_MS = 30 * 1000;
+const MAX_UNCHECKED_MS = 15 * 60 * 1000;
 const ALGORITHM = 'aes-256-gcm';
 // Node accepts truncated GCM tags (down to 4 bytes) unless the length is
 // pinned, which would let a forged cookie through by guessing 32 bits.
@@ -90,6 +94,7 @@ export function createSession(
     role,
     accessToken,
     checkedAt: now,
+    recheckAt: now + RECHECK_MS,
     exp: now + TTL_MS,
   };
 }
@@ -124,15 +129,15 @@ function readSession(token: string): Session | null {
 const pendingChecks = new Map<string, Promise<Session | null>>();
 
 /**
- * The session as it stands now: unchanged while its last check is recent,
- * re-checked with Discord once that's older than RECHECK_MS, and null once it
- * has expired, the user has left the guild, or the token was revoked.
+ * The session as it stands now: unchanged until its next check is due, then
+ * re-checked with Discord. Null once it has expired, the user has left the
+ * guild, the token was revoked, or Discord has been unreachable for too long.
  */
 export async function refreshSession(
   session: Session,
 ): Promise<Session | null> {
   if (session.exp <= Date.now()) return null;
-  if (Date.now() - session.checkedAt < RECHECK_MS) return session;
+  if (Date.now() < session.recheckAt) return session;
 
   let check = pendingChecks.get(session.accessToken);
   if (!check) {
@@ -145,19 +150,22 @@ export async function refreshSession(
 }
 
 async function recheck(session: Session): Promise<Session | null> {
+  const now = Date.now();
   let member;
   try {
     member = await getGuildMember(session.accessToken);
   } catch (err) {
-    // Discord is down or rate limiting; keep the session and try again soon
+    // Ride out a short Discord outage or rate limit, but not a long one
     console.error('Session re-check failed:', err);
-    return { ...session, checkedAt: Date.now() - RECHECK_MS + RETRY_MS };
+    if (now - session.checkedAt >= MAX_UNCHECKED_MS) return null;
+    return { ...session, recheckAt: now + RETRY_MS };
   }
   if (!member.isMember) return null;
   return {
     ...session,
     role: roleFor(session.userId, member.isAdmin),
-    checkedAt: Date.now(),
+    checkedAt: now,
+    recheckAt: now + RECHECK_MS,
   };
 }
 
