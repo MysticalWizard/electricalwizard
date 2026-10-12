@@ -14,6 +14,8 @@ export interface FieldDef {
   required?: boolean;
   enum?: string[];
   readOnly?: boolean;
+  /** Holds a Discord ID; writes must be a snowflake. */
+  snowflake?: boolean;
 }
 
 export interface ModelDef {

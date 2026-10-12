@@ -1,4 +1,4 @@
-import type { Client, TextChannel } from 'discord.js';
+import type { Client, EmbedBuilder } from 'discord.js';
 import { getDueReminders } from '#/services/reminder.js';
 import {
   getDueDDayNotifications,
@@ -11,6 +11,50 @@ import { colors, createEmbed } from '#/utils/embeds.js';
 const CHECK_INTERVAL = 30_000; // 30 seconds
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
+
+/** The fields that decide where a reminder or D-Day notification goes. */
+interface Recipient {
+  guildId: string;
+  channelId: string;
+  userId: string;
+  private: boolean;
+}
+
+/**
+ * Send an embed to the owner of a reminder or D-Day: as a DM when it's
+ * private, otherwise in its channel with a ping. These records can be edited
+ * from the dashboard, so delivery is held to the record's guild: the channel
+ * must belong to it, a DM recipient must be a member of it, and the owner is
+ * the only mention allowed.
+ */
+async function deliver(
+  client: Client,
+  record: Recipient,
+  embed: EmbedBuilder,
+): Promise<void> {
+  if (record.private) {
+    const guild = await client.guilds.fetch(record.guildId);
+    const member = await guild.members.fetch(record.userId);
+    await member.send({ embeds: [embed] });
+    return;
+  }
+
+  const channel = await client.channels.fetch(record.channelId);
+  if (
+    !channel?.isSendable() ||
+    channel.isDMBased() ||
+    channel.guildId !== record.guildId
+  ) {
+    throw new Error(
+      `Channel ${record.channelId} is not a text channel in guild ${record.guildId}`,
+    );
+  }
+  await channel.send({
+    content: `<@${record.userId}>`,
+    embeds: [embed],
+    allowedMentions: { users: [record.userId] },
+  });
+}
 
 /**
  * Start the reminder scheduler
@@ -60,20 +104,7 @@ async function checkAndSendReminders(client: Client): Promise<void> {
           .setTimestamp(reminder.createdAt)
           .setFooter({ text: 'Reminder set' });
 
-        if (reminder.private) {
-          // Send as DM
-          const user = await client.users.fetch(reminder.userId);
-          await user.send({ embeds: [embed] });
-        } else {
-          // Send in channel
-          const channel = await client.channels.fetch(reminder.channelId);
-          if (channel?.isTextBased()) {
-            await (channel as TextChannel).send({
-              content: `<@${reminder.userId}>`,
-              embeds: [embed],
-            });
-          }
-        }
+        await deliver(client, reminder, embed);
       } catch (error) {
         console.error(`Failed to send reminder ${reminder._id}:`, error);
       }
@@ -118,20 +149,7 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
             { name: 'Countdown', value: `<t:${timestamp}:R>`, inline: true },
           );
 
-        if (dday.private) {
-          // Send as DM
-          const user = await client.users.fetch(dday.userId);
-          await user.send({ embeds: [embed] });
-        } else {
-          // Send in channel
-          const channel = await client.channels.fetch(dday.channelId);
-          if (channel?.isTextBased()) {
-            await (channel as TextChannel).send({
-              content: `<@${dday.userId}>`,
-              embeds: [embed],
-            });
-          }
-        }
+        await deliver(client, dday, embed);
       } catch (error) {
         console.error(`Failed to send D-Day notification ${dday._id}:`, error);
       }
@@ -149,18 +167,7 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
             `**${dday.title}** has passed.\n\nWould you like to delete this countdown?\nUse \`/dday delete\` to remove it.`,
           );
 
-        if (dday.private) {
-          const user = await client.users.fetch(dday.userId);
-          await user.send({ embeds: [embed] });
-        } else {
-          const channel = await client.channels.fetch(dday.channelId);
-          if (channel?.isTextBased()) {
-            await (channel as TextChannel).send({
-              content: `<@${dday.userId}>`,
-              embeds: [embed],
-            });
-          }
-        }
+        await deliver(client, dday, embed);
       } catch (error) {
         console.error(
           `Failed to send D-Day completion notification ${dday._id}:`,

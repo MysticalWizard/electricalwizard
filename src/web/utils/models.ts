@@ -13,6 +13,8 @@ export interface FieldDef {
   required?: boolean;
   enum?: string[];
   readOnly?: boolean;
+  /** Holds a Discord ID; writes must be a snowflake. */
+  snowflake?: boolean;
 }
 
 export interface ModelDef {
@@ -83,9 +85,9 @@ export const modelRegistry: Record<string, ModelDef> = {
     ownerField: 'userId',
     fields: [
       { name: '_id', type: 'string', readOnly: true },
-      { name: 'guildId', type: 'string', required: true },
-      { name: 'channelId', type: 'string', required: true },
-      { name: 'userId', type: 'string', required: true },
+      { name: 'guildId', type: 'string', required: true, readOnly: true },
+      { name: 'channelId', type: 'string', required: true, snowflake: true },
+      { name: 'userId', type: 'string', required: true, snowflake: true },
       { name: 'message', type: 'string', required: true },
       { name: 'triggerAt', type: 'date', required: true },
       { name: 'timezone', type: 'string' },
@@ -100,9 +102,9 @@ export const modelRegistry: Record<string, ModelDef> = {
     ownerField: 'userId',
     fields: [
       { name: '_id', type: 'string', readOnly: true },
-      { name: 'guildId', type: 'string', required: true },
-      { name: 'channelId', type: 'string', required: true },
-      { name: 'userId', type: 'string', required: true },
+      { name: 'guildId', type: 'string', required: true, readOnly: true },
+      { name: 'channelId', type: 'string', required: true, snowflake: true },
+      { name: 'userId', type: 'string', required: true, snowflake: true },
       { name: 'title', type: 'string', required: true },
       { name: 'targetDate', type: 'date', required: true },
       { name: 'timezone', type: 'string' },
@@ -125,15 +127,15 @@ export const modelRegistry: Record<string, ModelDef> = {
     ownerField: 'addedById',
     fields: [
       { name: '_id', type: 'string', readOnly: true },
-      { name: 'guildId', type: 'string', required: true },
+      { name: 'guildId', type: 'string', required: true, readOnly: true },
       { name: 'quoteNumber', type: 'number', readOnly: true },
       { name: 'content', type: 'string', required: true },
-      { name: 'authorId', type: 'string' },
+      { name: 'authorId', type: 'string', snowflake: true },
       { name: 'authorName', type: 'string' },
       { name: 'year', type: 'number', required: true },
       { name: 'context', type: 'string' },
-      { name: 'addedById', type: 'string' },
-      { name: 'messageId', type: 'string' },
+      { name: 'addedById', type: 'string', snowflake: true },
+      { name: 'messageId', type: 'string', snowflake: true },
       { name: 'createdAt', type: 'date', readOnly: true },
       { name: 'updatedAt', type: 'date', readOnly: true },
     ],
@@ -143,8 +145,8 @@ export const modelRegistry: Record<string, ModelDef> = {
     ownerField: 'userId',
     fields: [
       { name: '_id', type: 'string', readOnly: true },
-      { name: 'guildId', type: 'string', required: true },
-      { name: 'userId', type: 'string', required: true },
+      { name: 'guildId', type: 'string', required: true, readOnly: true },
+      { name: 'userId', type: 'string', required: true, snowflake: true },
       { name: 'nickname', type: 'string', required: true },
       { name: 'createdAt', type: 'date', readOnly: true },
       { name: 'updatedAt', type: 'date', readOnly: true },

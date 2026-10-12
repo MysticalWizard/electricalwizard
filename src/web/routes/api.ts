@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { config } from '#/config.js';
 import { DDay } from '#/models/DDay.js';
 import { Reminder } from '#/models/Reminder.js';
 import { escapeRegex } from '#/utils/regex.js';
@@ -40,6 +41,22 @@ function filterFields(
     if (allowed.has(k)) filtered[k] = v;
   }
   return filtered;
+}
+
+// Discord IDs are 64-bit snowflakes, written in decimal
+const SNOWFLAKE = /^\d{17,20}$/;
+
+/** The first field in `data` that should hold a Discord ID but doesn't. */
+function invalidIdField(
+  modelName: string,
+  data: Record<string, unknown>,
+): string | undefined {
+  const def = modelRegistry[modelName];
+  return def?.fields.find((f) => {
+    if (!f.snowflake || !(f.name in data)) return false;
+    const value = data[f.name];
+    return typeof value !== 'string' || !SNOWFLAKE.test(value);
+  })?.name;
 }
 
 function canWrite(session: Session, modelName: string): boolean {
@@ -282,6 +299,15 @@ api.post('/:model', async (c) => {
   if (!sanitize(body)) return c.json({ error: 'Invalid input' }, 400);
 
   const filtered = filterFields(modelName, body);
+  const badId = invalidIdField(modelName, filtered);
+  if (badId) return c.json({ error: `${badId} must be a Discord ID` }, 400);
+
+  // The dashboard manages a single guild, so guild-scoped records always
+  // belong to it. Otherwise the bot could be pointed at other servers.
+  if (def.fields.some((f) => f.name === 'guildId')) {
+    filtered.guildId = config.guildId;
+  }
+
   const doc = await def.model.create(filtered);
   return c.json(doc, 201);
 });
@@ -310,6 +336,9 @@ api.put('/:model/:id', async (c) => {
   if (!sanitize(body)) return c.json({ error: 'Invalid input' }, 400);
 
   const filtered = filterFields(modelName, body);
+  const badId = invalidIdField(modelName, filtered);
+  if (badId) return c.json({ error: `${badId} must be a Discord ID` }, 400);
+
   const doc = await def.model.findByIdAndUpdate(c.req.param('id'), filtered, {
     returnDocument: 'after',
   });
