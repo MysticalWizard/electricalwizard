@@ -19,6 +19,9 @@ export interface Session {
 const COOKIE_NAME = 'ew_session';
 const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const ALGORITHM = 'aes-256-gcm';
+// Node accepts truncated GCM tags (down to 4 bytes) unless the length is
+// pinned, which would let a forged cookie through by guessing 32 bits.
+const AUTH_TAG_LENGTH = 16;
 
 let _key: Buffer | null = null;
 
@@ -48,7 +51,9 @@ function decrypt(token: string): string {
   const tag = Buffer.from(tagB64, 'base64');
   const encrypted = Buffer.from(encB64, 'base64');
 
-  const decipher = createDecipheriv(ALGORITHM, getKey(), iv);
+  const decipher = createDecipheriv(ALGORITHM, getKey(), iv, {
+    authTagLength: AUTH_TAG_LENGTH,
+  });
   decipher.setAuthTag(tag);
   return decipher.update(encrypted, undefined, 'utf8') + decipher.final('utf8');
 }
