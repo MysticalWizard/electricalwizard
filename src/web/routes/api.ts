@@ -67,6 +67,12 @@ function canWrite(session: Session, modelName: string): boolean {
   return session.role === 'admin' || session.role === 'owner';
 }
 
+/** A positive integer query value, or `fallback` if it's missing or invalid. */
+function positiveInt(value: string | undefined, fallback: number): number {
+  const n = parseInt(value ?? '', 10);
+  return n > 0 ? n : fallback;
+}
+
 // --- Routes ---
 
 api.get('/models', (c) => {
@@ -219,8 +225,9 @@ api.get('/:model', async (c) => {
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
   const session = c.get('session');
-  const page = parseInt(c.req.query('page') ?? '1', 10);
-  const limit = Math.min(parseInt(c.req.query('limit') ?? '25', 10), 100);
+  const page = positiveInt(c.req.query('page'), 1);
+  // MongoDB treats a limit of 0 as no limit, so it must stay at least 1
+  const limit = Math.min(positiveInt(c.req.query('limit'), 25), 100);
   const search = c.req.query('search') ?? '';
   const validFields = new Set(def.fields.map((f) => f.name));
   const requestedSort = c.req.query('sortField') ?? 'createdAt';
