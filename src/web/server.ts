@@ -40,7 +40,13 @@ export function startWebServer(): void {
     );
   }
 
-  serve({ fetch: app.fetch, port: config.webPort }, () => {
-    console.log(chalk.green(`  API server running on port ${config.webPort}`));
-  });
+  // Only the dashboard's Next server, on this machine, talks to the API
+  serve(
+    { fetch: app.fetch, hostname: '127.0.0.1', port: config.webPort },
+    () => {
+      console.log(
+        chalk.green(`  API server running on port ${config.webPort}`),
+      );
+    },
+  );
 }

@@ -28,7 +28,8 @@ module.exports = {
     {
       name: 'electricalwizard-dashboard',
       script: 'node_modules/next/dist/bin/next',
-      args: 'start --port 8450',
+      // Served through a reverse proxy on the same machine
+      args: 'start --port 8450 --hostname 127.0.0.1',
       cwd: './dashboard',
       exec_mode: 'fork',
       instances: 1,

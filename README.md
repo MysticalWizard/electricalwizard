@@ -112,7 +112,7 @@ A Discord bot secretary for a small private server with friends — the n-th cir
    > The dashboard API is its own process (`src/web/index.ts`, built to
    > `dist/web/index.js`) listening on `WEB_PORT`; PM2 runs it alongside the
    > bot and dashboard (see below). The Next.js dashboard runs on port 8450
-   > and proxies `/api` and `/auth` to `http://localhost:7611`, so keep
+   > and proxies `/api` and `/auth` to `http://127.0.0.1:7611`, so keep
    > `WEB_PORT=7611` unless you also change `dashboard/next.config.ts`.
 
 ## Production Deployment
@@ -128,6 +128,10 @@ pnpm pm2:delete     # Remove them from PM2
 ```
 
 > These scripts are intended for simple single-instance deployments.
+
+The API and, under PM2, the dashboard listen on `127.0.0.1` only. Serve the
+dashboard through a reverse proxy on the same machine (nginx, Caddy,
+cloudflared...) pointed at `127.0.0.1:8450`, which also terminates HTTPS.
 
 Make sure to run `pnpm build:all` before using PM2 commands.
 
