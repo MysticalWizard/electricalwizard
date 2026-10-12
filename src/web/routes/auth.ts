@@ -65,9 +65,11 @@ auth.get('/callback', async (c) => {
   }
 });
 
-auth.get('/logout', async (c) => {
+// POST, so the Origin check stops other sites from logging users out (which
+// revokes their sessions on every device)
+auth.post('/logout', async (c) => {
   await endSession(c);
-  return c.redirect('/');
+  return c.redirect('/', 303);
 });
 
 auth.get('/me', async (c) => {

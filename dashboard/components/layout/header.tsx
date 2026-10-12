@@ -26,12 +26,14 @@ export function Header() {
         {roleLabel}
       </span>
       <span className="text-sm">{user.username}</span>
-      <a
-        href="/auth/logout"
-        className="text-sm text-muted-foreground hover:text-foreground"
-      >
-        Logout
-      </a>
+      <form method="post" action="/auth/logout">
+        <button
+          type="submit"
+          className="text-sm text-muted-foreground hover:text-foreground cursor-pointer"
+        >
+          Logout
+        </button>
+      </form>
     </header>
   );
 }
