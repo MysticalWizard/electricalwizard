@@ -5,3 +5,9 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+permissions:
+  '@tanstack/react-table':
+    skills: true
+skills:
+  dirs:
+    - .claude/skills

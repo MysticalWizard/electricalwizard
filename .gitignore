@@ -1,6 +1,10 @@
 # dependencies
 node_modules/
 
+# agent skills linked from dependencies by pnpm
+.claude/skills/pnpm-*
+.claude/skills/.gitignore
+
 # environment variables
 .env
 .env.*
