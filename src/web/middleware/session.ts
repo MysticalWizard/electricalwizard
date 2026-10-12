@@ -128,6 +128,11 @@ function readSession(token: string): Session | null {
 // streams for one session share a single call to Discord
 const pendingChecks = new Map<string, Promise<Session | null>>();
 
+// Tokens of sessions logged out of, so copies of those cookies stop working at
+// once rather than at their next re-check. Kept until the session would have
+// expired anyway.
+const loggedOut = new Set<string>();
+
 /**
  * The session as it stands now: unchanged until its next check is due, then
  * re-checked with Discord. Null once it has expired, the user has left the
@@ -136,7 +141,9 @@ const pendingChecks = new Map<string, Promise<Session | null>>();
 export async function refreshSession(
   session: Session,
 ): Promise<Session | null> {
-  if (session.exp <= Date.now()) return null;
+  if (session.exp <= Date.now() || loggedOut.has(session.accessToken)) {
+    return null;
+  }
   if (Date.now() < session.recheckAt) return session;
 
   let check = pendingChecks.get(session.accessToken);
@@ -185,9 +192,9 @@ export async function getSession(c: Context): Promise<Session | null> {
 }
 
 /**
- * Log out: clear the cookie and revoke the Discord token. Discord revokes
- * every token from the same authorization, so this ends the user's sessions
- * on other devices too, and any copy of this cookie, at their next re-check.
+ * Log out: clear the cookie and revoke the Discord token. Copies of this
+ * cookie stop working at once. Discord revokes every token from the same
+ * authorization, so sessions on other devices end at their next re-check.
  */
 export async function endSession(c: Context): Promise<void> {
   const token = getCookie(c, COOKIE_NAME);
@@ -195,8 +202,15 @@ export async function endSession(c: Context): Promise<void> {
   clearSession(c);
   if (!session) return;
 
+  const { accessToken } = session;
+  loggedOut.add(accessToken);
+  setTimeout(
+    () => loggedOut.delete(accessToken),
+    session.exp - Date.now(),
+  ).unref();
+
   try {
-    await revokeToken(session.accessToken);
+    await revokeToken(accessToken);
   } catch (err) {
     console.error('Failed to revoke Discord token:', err);
   }
