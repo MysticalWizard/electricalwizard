@@ -12,7 +12,8 @@ import {
   createSession,
   setSession,
   getSession,
-  clearSession,
+  endSession,
+  roleFor,
 } from '../middleware/session.js';
 
 const auth = new Hono();
@@ -48,14 +49,13 @@ auth.get('/callback', async (c) => {
       return c.text('You are not a member of this server.', 403);
     }
 
-    const role =
-      user.id === config.ownerId
-        ? 'owner'
-        : member.isAdmin
-          ? 'admin'
-          : 'member';
-
-    const session = createSession(user.id, user.username, user.avatar, role);
+    const session = createSession(
+      user.id,
+      user.username,
+      user.avatar,
+      roleFor(user.id, member.isAdmin),
+      token.access_token,
+    );
     setSession(c, session);
 
     return c.redirect('/');
@@ -65,13 +65,13 @@ auth.get('/callback', async (c) => {
   }
 });
 
-auth.get('/logout', (c) => {
-  clearSession(c);
+auth.get('/logout', async (c) => {
+  await endSession(c);
   return c.redirect('/');
 });
 
-auth.get('/me', (c) => {
-  const session = getSession(c);
+auth.get('/me', async (c) => {
+  const session = await getSession(c);
   if (!session) return c.json({ authenticated: false }, 401);
 
   return c.json({

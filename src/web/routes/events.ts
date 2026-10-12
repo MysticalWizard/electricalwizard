@@ -1,14 +1,11 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { getSession } from '../middleware/session.js';
+import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 import { eventBus, type DbChangeEvent } from '../utils/eventBus.js';
 
-const events = new Hono();
+const events = new Hono<AuthEnv>();
 
-events.get('/', (c) => {
-  const session = getSession(c);
-  if (!session) return c.text('Unauthorized', 401);
-
+events.get('/', requireAuth, (c) => {
   return streamSSE(c, async (stream) => {
     const onDbChange = (data: DbChangeEvent) => {
       stream

@@ -3,11 +3,11 @@ import { config } from '#/config.js';
 import { DDay } from '#/models/DDay.js';
 import { Reminder } from '#/models/Reminder.js';
 import { escapeRegex } from '#/utils/regex.js';
-import { requireAuth } from '../middleware/auth.js';
-import { getSession, type Session } from '../middleware/session.js';
+import { requireAuth, type AuthEnv } from '../middleware/auth.js';
+import type { Session } from '../middleware/session.js';
 import { modelRegistry } from '../utils/models.js';
 
-const api = new Hono();
+const api = new Hono<AuthEnv>();
 
 api.use('*', requireAuth);
 
@@ -80,7 +80,7 @@ api.get('/models', (c) => {
 });
 
 api.get('/stats', async (c) => {
-  const session = getSession(c)!;
+  const session = c.get('session');
   const isPrivileged = session.role === 'admin' || session.role === 'owner';
   const ownerFilter = isPrivileged ? {} : { userId: session.userId };
 
@@ -123,7 +123,7 @@ const ACTIVITY_PROJECTION = {
 };
 
 api.get('/activity', async (c) => {
-  const session = getSession(c)!;
+  const session = c.get('session');
   const isPrivileged = session.role === 'admin' || session.role === 'owner';
 
   const perModel = await Promise.all(
@@ -156,7 +156,7 @@ api.get('/analytics/:model', async (c) => {
   const def = modelRegistry[modelName];
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
-  const session = getSession(c)!;
+  const session = c.get('session');
   const groupBy = c.req.query('groupBy') ?? 'day';
   const dateFrom = c.req.query('dateFrom');
   const dateTo = c.req.query('dateTo');
@@ -218,7 +218,7 @@ api.get('/:model', async (c) => {
   const def = modelRegistry[modelName];
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
-  const session = getSession(c)!;
+  const session = c.get('session');
   const page = parseInt(c.req.query('page') ?? '1', 10);
   const limit = Math.min(parseInt(c.req.query('limit') ?? '25', 10), 100);
   const search = c.req.query('search') ?? '';
@@ -270,7 +270,7 @@ api.get('/:model/:id', async (c) => {
   const doc = await def.model.findById(c.req.param('id')).lean();
   if (!doc) return c.json({ error: 'Not found' }, 404);
 
-  const session = getSession(c)!;
+  const session = c.get('session');
   if (
     def.hasPrivacy &&
     def.ownerField &&
@@ -290,7 +290,7 @@ api.post('/:model', async (c) => {
   const def = modelRegistry[modelName];
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
-  const session = getSession(c)!;
+  const session = c.get('session');
   if (!canWrite(session, modelName)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
@@ -317,7 +317,7 @@ api.put('/:model/:id', async (c) => {
   const def = modelRegistry[modelName];
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
-  const session = getSession(c)!;
+  const session = c.get('session');
   if (!canWrite(session, modelName)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
@@ -352,7 +352,7 @@ api.delete('/:model/:id', async (c) => {
   const def = modelRegistry[modelName];
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
-  const session = getSession(c)!;
+  const session = c.get('session');
   if (!canWrite(session, modelName)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
