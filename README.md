@@ -72,7 +72,8 @@ A Discord bot secretary for a small private server with friends — the n-th cir
    # Web dashboard
    DISCORD_CLIENT_SECRET=YOUR_DISCORD_CLIENT_SECRET
    WEB_PORT=7611
-   WEB_SESSION_SECRET=YOUR_SESSION_SECRET_32_CHARS_MIN
+   # At least 32 random characters, e.g. from `openssl rand -base64 32`
+   WEB_SESSION_SECRET=
    WEB_BASE_URL=http://localhost:8450
    ```
 

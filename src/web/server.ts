@@ -28,7 +28,17 @@ app.route('/api', api);
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
+// Session cookies are encrypted with a key derived from this secret, so a
+// guessable one lets anyone holding a cookie crack it offline and forge others
+const MIN_SECRET_LENGTH = 32;
+
 export function startWebServer(): void {
+  if (config.webSessionSecret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `WEB_SESSION_SECRET must be at least ${MIN_SECRET_LENGTH} characters; generate one with \`openssl rand -base64 32\``,
+    );
+  }
+
   if (
     process.env.NODE_ENV === 'production' &&
     !config.webBaseUrl.startsWith('https')
