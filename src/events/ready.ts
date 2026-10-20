@@ -5,6 +5,7 @@ import { Bot } from '#/models/Bot.js';
 import { Guild } from '#/models/Guild.js';
 import { config } from '#/config.js';
 import { startReminderScheduler } from '#/services/scheduler.js';
+import { startHeartbeat } from '#/services/heartbeat.js';
 
 export const event: Event<Events.ClientReady> = {
   name: Events.ClientReady,
@@ -41,5 +42,6 @@ export const event: Event<Events.ClientReady> = {
     );
 
     startReminderScheduler(client);
+    startHeartbeat(client);
   },
 };

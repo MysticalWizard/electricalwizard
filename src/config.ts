@@ -39,4 +39,5 @@ export const config = {
   webPort: parseInt(process.env.WEB_PORT ?? '7611', 10),
   webSessionSecret: requireEnv('WEB_SESSION_SECRET'),
   webBaseUrl: requireEnv('WEB_BASE_URL'),
+  statusHeartbeatToken: process.env.STATUS_HEARTBEAT_TOKEN,
 } as const;
