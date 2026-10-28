@@ -52,8 +52,8 @@
     "chalk": "^6.0.1",
     "dayjs": "^1.11.23",
     "discord.js": "^14.27.0",
-    "hono": "^4.13.13",
-    "mongoose": "^9.11.2"
+    "hono": "^4.13.14",
+    "mongoose": "^9.11.4"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -69,7 +69,7 @@
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.72.1"
   },
   "lint-staged": {
     "*.{ts,mjs}": "eslint --fix",

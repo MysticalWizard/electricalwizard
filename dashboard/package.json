@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@electricalwizard/shared": "workspace:*",
-    "@tanstack/react-query": "^5.104.1",
+    "@tanstack/react-query": "^5.105.0",
     "@tanstack/react-table": "^9.2.8",
-    "next": "^16.4.0",
+    "next": "^16.4.3",
     "radix-ui": "^1.7.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -27,9 +27,9 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.4.0",
+    "eslint-config-next": "^16.4.3",
     "eslint-config-prettier": "^10.1.8",
-    "lucide-react": "^1.55.0",
+    "lucide-react": "^1.62.0",
     "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
