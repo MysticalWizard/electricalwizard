@@ -14,19 +14,27 @@ export function resolveLanguage(input: string): string {
   return LANGUAGE_ALIASES[input.toLowerCase()] ?? input.toLowerCase();
 }
 
-const LANGUAGE_FLAGS: Record<string, string> = {
-  en: '\u{1F1FA}\u{1F1F8}',
-  zh: '\u{1F1E8}\u{1F1F3}',
-  ko: '\u{1F1F0}\u{1F1F7}',
-  ja: '\u{1F1EF}\u{1F1F5}',
-  es: '\u{1F1EA}\u{1F1F8}',
-  fr: '\u{1F1EB}\u{1F1F7}',
-  de: '\u{1F1E9}\u{1F1EA}',
-  yue: '\u{1F1ED}\u{1F1F0}',
-};
+/**
+ * Flag of the country where a language is most likely spoken (en → 🇺🇸,
+ * pt → 🇧🇷, en-gb → 🇬🇧), or null if the code isn't a language with one.
+ */
+function flagFromLocale(lang: string): string | null {
+  if (lang === 'und') return null;
+  let region: string | undefined;
+  try {
+    region = new Intl.Locale(lang).maximize().region;
+  } catch {
+    return null;
+  }
+  // Skip numeric UN regions such as 001 (world), used for Esperanto.
+  if (!region || !/^[A-Z]{2}$/.test(region)) return null;
+  return String.fromCodePoint(
+    ...[...region].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
+  );
+}
 
-export function getFlagForLang(lang: string): string {
-  return LANGUAGE_FLAGS[lang.toLowerCase()] ?? '\u{1F310}';
+export function getFlagForLang(lang: string, emoji?: string | null): string {
+  return emoji ?? flagFromLocale(lang.toLowerCase()) ?? '\u{1F310}';
 }
 
 interface TranslationResult {
@@ -35,6 +43,8 @@ interface TranslationResult {
   detectedSourceLangName: string;
   targetLang: string;
   targetLangName: string;
+  /** Emoji the API picked for a custom target, if any. */
+  targetLangEmoji: string | null;
 }
 
 async function fetchTranslation(
@@ -65,6 +75,7 @@ async function fetchTranslation(
     detected_source_lang_name: string;
     target_lang: string;
     target_lang_name: string;
+    target_lang_emoji?: string | null;
   };
 
   return {
@@ -73,6 +84,7 @@ async function fetchTranslation(
     detectedSourceLangName: data.detected_source_lang_name,
     targetLang: data.target_lang,
     targetLangName: data.target_lang_name,
+    targetLangEmoji: data.target_lang_emoji ?? null,
   };
 }
 

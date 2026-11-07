@@ -109,7 +109,7 @@ async function handleTranslateReply(
       resolveLanguage(langArg ?? 'en'),
     );
 
-    const flag = getFlagForLang(result.targetLang);
+    const flag = getFlagForLang(result.targetLang, result.targetLangEmoji);
 
     const embed = createEmbed()
       .setTitle(`${flag} Translation to ${result.targetLangName}`)
