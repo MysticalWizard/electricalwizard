@@ -33,6 +33,7 @@ export interface ModelDef {
 export const modelRegistry: Record<string, ModelDef> = {
   users: {
     model: User as unknown as Model<unknown>,
+    ownerField: 'discordId',
     fields: [
       { name: '_id', type: 'string', readOnly: true },
       { name: 'discordId', type: 'string', required: true, readOnly: true },

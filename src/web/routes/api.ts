@@ -238,12 +238,22 @@ api.get('/:model', async (c) => {
 
   const query: Record<string, unknown> = {};
 
-  // Privacy filtering, or the caller's own records when asked for
-  if (def.ownerField) {
-    const isPrivileged = session.role === 'admin' || session.role === 'owner';
-    if ((def.hasPrivacy && !isPrivileged) || c.req.query('mine') === 'true') {
-      query[def.ownerField] = session.userId;
-    }
+  // Privacy filtering — members only see their own records
+  const isPrivileged = session.role === 'admin' || session.role === 'owner';
+  if (def.hasPrivacy && def.ownerField && !isPrivileged) {
+    query[def.ownerField] = session.userId;
+  }
+
+  // The caller's own records: `mine=true` matches on the owner field, and
+  // `mine=<field>` on another Discord ID field (e.g. a quote's `authorId`)
+  const mine = c.req.query('mine');
+  if (mine) {
+    const mineField =
+      mine === 'true'
+        ? def.ownerField
+        : def.fields.find((f) => f.snowflake && f.name === mine)?.name;
+    if (!mineField) return c.json({ error: `Invalid mine: ${mine}` }, 400);
+    query[mineField] = session.userId;
   }
 
   if (search) {
