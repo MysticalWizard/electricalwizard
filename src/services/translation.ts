@@ -1,7 +1,7 @@
 import { config } from '#/config.js';
 import { TranslationCount } from '#/models/TranslationCount.js';
 
-const LANGUAGE_ALIASES: Record<string, string> = {
+const LANGUAGE_ALIAS_OVERRIDES: Record<string, string> = {
   kr: 'ko',
   jp: 'ja',
   cn: 'zh',
@@ -12,7 +12,7 @@ const LANGUAGE_ALIASES: Record<string, string> = {
 };
 
 export function resolveLanguage(input: string): string {
-  return LANGUAGE_ALIASES[input.toLowerCase()] ?? input.toLowerCase();
+  return LANGUAGE_ALIAS_OVERRIDES[input.toLowerCase()] ?? input.toLowerCase();
 }
 
 /**
