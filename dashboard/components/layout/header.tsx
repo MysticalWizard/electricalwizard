@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { BotUptime } from './bot-uptime';
 
@@ -27,7 +28,9 @@ export function Header() {
       <span className={`text-xs px-2 py-0.5 rounded ${roleBadge}`}>
         {roleLabel}
       </span>
-      <span className="text-sm">{user.username}</span>
+      <Link href="/profile" className="text-sm hover:underline">
+        {user.username}
+      </Link>
       <form method="post" action="/auth/logout">
         <button
           type="submit"
