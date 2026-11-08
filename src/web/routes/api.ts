@@ -3,6 +3,7 @@ import { config } from '#/config.js';
 import { DDay } from '#/models/DDay.js';
 import { Reminder } from '#/models/Reminder.js';
 import { getBotUptime } from '#/services/uptime.js';
+import { getTranslationCounts } from '#/services/translation.js';
 import { escapeRegex } from '#/utils/regex.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 import type { Session } from '../middleware/session.js';
@@ -159,6 +160,18 @@ api.get('/activity', async (c) => {
 
   return c.json(items.slice(0, 20));
 });
+
+// Not in the model registry: its documents are daily counters, not records.
+// Registered before `/analytics/:model` so it takes precedence.
+api.get('/analytics/translations', async (c) =>
+  c.json(
+    await getTranslationCounts({
+      groupBy: c.req.query('groupBy'),
+      dateFrom: c.req.query('dateFrom'),
+      dateTo: c.req.query('dateTo'),
+    }),
+  ),
+);
 
 api.get('/analytics/:model', async (c) => {
   const modelName = c.req.param('model');

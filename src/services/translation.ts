@@ -1,4 +1,5 @@
 import { config } from '#/config.js';
+import { TranslationCount } from '#/models/TranslationCount.js';
 
 const LANGUAGE_ALIASES: Record<string, string> = {
   kr: 'ko',
@@ -99,4 +100,63 @@ export async function translateText(
     await new Promise((r) => setTimeout(r, 2000));
     return await fetchTranslation(text, targetLang);
   }
+}
+
+/** Count one translation request for today (UTC) in the guild. */
+export async function countTranslation(
+  guildId: string,
+  succeeded: boolean,
+): Promise<void> {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  await TranslationCount.updateOne(
+    { guildId, date },
+    { $inc: { [succeeded ? 'success' : 'failed']: 1 } },
+    { upsert: true },
+  );
+}
+
+export interface TranslationCountPoint {
+  date: string;
+  success: number;
+  failed: number;
+}
+
+const DATE_FORMATS: Record<string, string> = {
+  day: '%Y-%m-%d',
+  week: '%Y-W%V',
+  month: '%Y-%m',
+};
+
+/**
+ * Translation requests across all guilds, summed per day, ISO week or month.
+ * `dateFrom` and `dateTo` are inclusive.
+ */
+export async function getTranslationCounts(options: {
+  groupBy?: string | undefined;
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
+}): Promise<TranslationCountPoint[]> {
+  const date: Record<string, Date> = {};
+  if (options.dateFrom) date.$gte = new Date(options.dateFrom);
+  if (options.dateTo) date.$lte = new Date(options.dateTo);
+
+  const results = await TranslationCount.aggregate<TranslationCountPoint>([
+    ...(Object.keys(date).length ? [{ $match: { date } }] : []),
+    {
+      $group: {
+        _id: {
+          $dateToString: {
+            format: DATE_FORMATS[options.groupBy ?? 'day'] ?? DATE_FORMATS.day,
+            date: '$date',
+          },
+        },
+        success: { $sum: { $ifNull: ['$success', 0] } },
+        failed: { $sum: { $ifNull: ['$failed', 0] } },
+      },
+    },
+    { $sort: { _id: 1 } },
+    { $project: { _id: 0, date: '$_id', success: 1, failed: 1 } },
+  ]);
+  return results;
 }

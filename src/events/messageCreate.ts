@@ -6,6 +6,7 @@ import {
   translateText,
   getFlagForLang,
   resolveLanguage,
+  countTranslation,
 } from '#/services/translation.js';
 import {
   formatQuoteDisplay,
@@ -90,6 +91,7 @@ async function handleTranslateReply(
   message: Message<true>,
   langArg?: string,
 ): Promise<void> {
+  let succeeded = false;
   try {
     const referencedMessage = await message.channel.messages.fetch(
       message.reference!.messageId!,
@@ -122,11 +124,16 @@ async function handleTranslateReply(
       embeds: [embed],
       allowedMentions: { repliedUser: false },
     });
+    succeeded = true;
   } catch (error) {
     console.error('Error translating message:', error);
     await message.reply({
       content: 'Translation failed. Please try again later.',
       allowedMentions: { repliedUser: false },
+    });
+  } finally {
+    countTranslation(message.guildId, succeeded).catch((error: unknown) => {
+      console.error('Failed to count translation:', error);
     });
   }
 }

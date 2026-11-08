@@ -1,11 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { useModels, useAnalytics, useStats } from '@/api/hooks';
+import {
+  useModels,
+  useAnalytics,
+  useStats,
+  useTranslationCounts,
+} from '@/api/hooks';
 import { DateRangeFilter } from '@/components/charts/date-range-filter';
 import { LineChart } from '@/components/charts/line-chart';
 import { BarChart } from '@/components/charts/bar-chart';
 import { PieChart } from '@/components/charts/pie-chart';
+import type { TranslationCountPoint } from '@electricalwizard/shared';
+import {
+  StackedBarChart,
+  type Series,
+} from '@/components/charts/stacked-bar-chart';
+
+const TRANSLATION_SERIES: Series<TranslationCountPoint>[] = [
+  { key: 'success', label: 'Successful', color: '#57f287' },
+  { key: 'failed', label: 'Failed', color: '#ed4245' },
+];
 
 export default function AnalyticsPage() {
   const { data: models } = useModels();
@@ -16,6 +31,12 @@ export default function AnalyticsPage() {
   const [dateTo, setDateTo] = useState('');
 
   const { data: analytics } = useAnalytics(model, {
+    groupBy,
+    dateFrom,
+    dateTo,
+  });
+
+  const { data: translations } = useTranslationCounts({
     groupBy,
     dateFrom,
     dateTo,
@@ -64,6 +85,11 @@ export default function AnalyticsPage() {
         <LineChart data={analytics ?? []} title="Created Over Time" />
         <BarChart data={analytics ?? []} title={`Count by ${groupBy}`} />
         <PieChart data={pieData} title="Data Distribution" />
+        <StackedBarChart
+          data={translations ?? []}
+          series={TRANSLATION_SERIES}
+          title={`Translations per ${groupBy}`}
+        />
       </div>
     </>
   );

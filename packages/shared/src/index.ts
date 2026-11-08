@@ -8,6 +8,7 @@ export type {
   BotUptime,
   ActivityItem,
   AnalyticsPoint,
+  TranslationCountPoint,
   DbChangeEvent,
   SSEEvent,
 } from './types/dashboard.js';

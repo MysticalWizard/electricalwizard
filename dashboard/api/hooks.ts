@@ -12,6 +12,7 @@ import type {
   ActivityItem,
   AnalyticsPoint,
   BotUptime,
+  TranslationCountPoint,
 } from '@electricalwizard/shared';
 
 export function useModels() {
@@ -128,5 +129,22 @@ export function useAnalytics(
       return api<AnalyticsPoint[]>(`/api/analytics/${model}?${qs}`);
     },
     enabled: !!model,
+  });
+}
+
+export function useTranslationCounts(params: {
+  groupBy: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  return useQuery({
+    // Under 'analytics' so SSE changes to `translations` refresh it
+    queryKey: ['analytics', 'translations', params],
+    queryFn: () => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v) as [string, string][],
+      ).toString();
+      return api<TranslationCountPoint[]>(`/api/analytics/translations?${qs}`);
+    },
   });
 }

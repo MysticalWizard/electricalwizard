@@ -61,6 +61,12 @@ export interface AnalyticsPoint {
   count: number;
 }
 
+export interface TranslationCountPoint {
+  date: string;
+  success: number;
+  failed: number;
+}
+
 export interface DbChangeEvent {
   /** Model registry key, e.g. `ddays`. */
   model: string;
