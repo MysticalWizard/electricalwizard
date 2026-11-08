@@ -45,6 +45,12 @@ export interface Stats {
   activeDdays: number;
 }
 
+export interface BotUptime {
+  online: boolean;
+  /** ISO time the bot became ready; null while it's offline. */
+  startedAt: string | null;
+}
+
 export interface ActivityItem {
   model: string;
   doc: Record<string, unknown>;

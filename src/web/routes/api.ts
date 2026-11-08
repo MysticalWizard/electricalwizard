@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { config } from '#/config.js';
 import { DDay } from '#/models/DDay.js';
 import { Reminder } from '#/models/Reminder.js';
+import { getBotUptime } from '#/services/uptime.js';
 import { escapeRegex } from '#/utils/regex.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 import type { Session } from '../middleware/session.js';
@@ -117,6 +118,8 @@ api.get('/stats', async (c) => {
 
   return c.json(stats);
 });
+
+api.get('/uptime', async (c) => c.json(await getBotUptime()));
 
 // Only the fields the dashboard's activity feed summarizes
 const ACTIVITY_PROJECTION = {

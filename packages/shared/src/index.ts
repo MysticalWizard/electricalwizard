@@ -5,6 +5,7 @@ export type {
   ModelDef,
   PaginatedResponse,
   Stats,
+  BotUptime,
   ActivityItem,
   AnalyticsPoint,
   DbChangeEvent,

@@ -12,6 +12,8 @@ export interface IBot extends Document {
   status: BotStatusType;
   activityType: BotActivity;
   activityName: string;
+  startedAt?: Date | undefined;
+  lastSeenAt?: Date | undefined;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +38,13 @@ const botSchema = new Schema<IBot>(
     activityName: {
       type: String,
       default: '',
+    },
+    // When the bot last became ready, and its latest liveness heartbeat
+    startedAt: {
+      type: Date,
+    },
+    lastSeenAt: {
+      type: Date,
     },
   },
   {

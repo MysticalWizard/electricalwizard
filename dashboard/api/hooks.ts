@@ -11,6 +11,7 @@ import type {
   Stats,
   ActivityItem,
   AnalyticsPoint,
+  BotUptime,
 } from '@electricalwizard/shared';
 
 export function useModels() {
@@ -95,6 +96,15 @@ export function useStats() {
   return useQuery({
     queryKey: ['stats'],
     queryFn: () => api<Stats>('/api/stats'),
+  });
+}
+
+export function useBotUptime() {
+  return useQuery({
+    queryKey: ['uptime'],
+    queryFn: () => api<BotUptime>('/api/uptime'),
+    // A restart arrives over SSE; polling catches the bot going offline
+    refetchInterval: 30_000,
   });
 }
 

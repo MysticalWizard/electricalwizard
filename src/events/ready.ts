@@ -6,6 +6,7 @@ import { Guild } from '#/models/Guild.js';
 import { config } from '#/config.js';
 import { startReminderScheduler } from '#/services/scheduler.js';
 import { startHeartbeat } from '#/services/heartbeat.js';
+import { startUptimeTracking } from '#/services/uptime.js';
 import { syncGuildMembers } from '#/services/user.js';
 
 export const event: Event<Events.ClientReady> = {
@@ -44,6 +45,7 @@ export const event: Event<Events.ClientReady> = {
 
     startReminderScheduler(client);
     startHeartbeat(client);
+    await startUptimeTracking(client);
 
     // Catch members who joined while the bot was offline.
     for (const guild of guilds.values()) {

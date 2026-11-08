@@ -21,6 +21,9 @@ export function useSSE() {
 
     const flush = () => {
       timer = null;
+      if (changedModels.has('bots')) {
+        qc.invalidateQueries({ queryKey: ['uptime'] });
+      }
       for (const model of changedModels) {
         qc.invalidateQueries({ queryKey: ['documents', model] });
         qc.invalidateQueries({ queryKey: ['analytics', model] });

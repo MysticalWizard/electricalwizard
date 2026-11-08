@@ -76,6 +76,8 @@ export const modelRegistry: Record<string, ModelDef> = {
         enum: ['0', '1', '2', '3', '5'],
       },
       { name: 'activityName', type: 'string' },
+      { name: 'startedAt', type: 'date', readOnly: true },
+      { name: 'lastSeenAt', type: 'date', readOnly: true },
       { name: 'createdAt', type: 'date', readOnly: true },
       { name: 'updatedAt', type: 'date', readOnly: true },
     ],

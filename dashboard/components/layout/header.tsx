@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
+import { BotUptime } from './bot-uptime';
 
 export function Header() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export function Header() {
 
   return (
     <header className="h-12 border-b border-border flex items-center justify-end px-4 gap-3 shrink-0">
+      <BotUptime />
       <span className={`text-xs px-2 py-0.5 rounded ${roleBadge}`}>
         {roleLabel}
       </span>
