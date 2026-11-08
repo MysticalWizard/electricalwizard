@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { randomBytes } from 'node:crypto';
 import { config } from '#/config.js';
+import { setDefaultTimezone } from '#/services/user.js';
 import {
   getAuthUrl,
   exchangeCode,
@@ -18,15 +19,26 @@ import {
 
 const auth = new Hono();
 
+const oauthCookie = {
+  httpOnly: true,
+  sameSite: 'Lax',
+  secure: config.webBaseUrl.startsWith('https'),
+  path: '/',
+  maxAge: 300,
+} as const;
+
 auth.get('/login', (c) => {
   const state = randomBytes(16).toString('hex');
-  setCookie(c, 'oauth_state', state, {
-    httpOnly: true,
-    sameSite: 'Lax',
-    secure: config.webBaseUrl.startsWith('https'),
-    path: '/',
-    maxAge: 300,
-  });
+  setCookie(c, 'oauth_state', state, oauthCookie);
+
+  // The login page passes the browser's timezone, kept until the callback
+  const tz = c.req.query('tz');
+  if (tz && tz.length <= 64) {
+    setCookie(c, 'oauth_tz', tz, oauthCookie);
+  } else {
+    deleteCookie(c, 'oauth_tz', { path: '/' });
+  }
+
   return c.redirect(getAuthUrl(state));
 });
 
@@ -34,7 +46,9 @@ auth.get('/callback', async (c) => {
   const code = c.req.query('code');
   const state = c.req.query('state');
   const storedState = getCookie(c, 'oauth_state');
+  const tz = getCookie(c, 'oauth_tz');
   deleteCookie(c, 'oauth_state', { path: '/' });
+  deleteCookie(c, 'oauth_tz', { path: '/' });
 
   if (!code || !state || state !== storedState) {
     return c.text('Invalid OAuth state', 400);
@@ -57,6 +71,14 @@ auth.get('/callback', async (c) => {
       token.access_token,
     );
     setSession(c, session);
+
+    if (tz) {
+      try {
+        await setDefaultTimezone(user.id, user.username, tz);
+      } catch (err) {
+        console.error(`Failed to set timezone for ${user.id}:`, err);
+      }
+    }
 
     return c.redirect('/');
   } catch (err) {

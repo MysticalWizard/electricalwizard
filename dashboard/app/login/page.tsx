@@ -1,5 +1,6 @@
 import { Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LoginLink } from './login-link';
 
 export default function LoginPage() {
   return (
@@ -13,7 +14,7 @@ export default function LoginPage() {
           Sign in with Discord to access the dashboard
         </p>
         <Button asChild>
-          <a href="/auth/login">Login with Discord</a>
+          <LoginLink>Login with Discord</LoginLink>
         </Button>
       </div>
     </div>

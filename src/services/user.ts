@@ -32,3 +32,31 @@ export async function syncGuildMembers(guild: Guild): Promise<number> {
   }
   return missing.size;
 }
+
+/**
+ * Give a user a timezone if they don't have one yet, creating the stored user
+ * if needed. A timezone the user already set is never replaced. Returns
+ * whether the timezone was saved.
+ */
+export async function setDefaultTimezone(
+  discordId: string,
+  username: string,
+  timezone: string,
+): Promise<boolean> {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+  } catch {
+    return false;
+  }
+
+  await User.findOneAndUpdate(
+    { discordId },
+    { $set: { username }, $setOnInsert: { isBot: false } },
+    { upsert: true },
+  );
+  const result = await User.updateOne(
+    { discordId, timezone: { $in: [null, ''] } },
+    { $set: { timezone } },
+  );
+  return result.modifiedCount > 0;
+}
