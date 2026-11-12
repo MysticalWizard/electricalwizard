@@ -24,6 +24,16 @@ app.use('*', async (c, next) => {
   return next();
 });
 
+// Responses carry session-specific data, so browsers and proxies mustn't
+// cache them. The event stream sets its own Cache-Control.
+app.use('*', async (c, next) => {
+  await next();
+  c.res.headers.set('X-Content-Type-Options', 'nosniff');
+  if (!c.res.headers.has('Cache-Control')) {
+    c.res.headers.set('Cache-Control', 'no-store');
+  }
+});
+
 app.route('/auth', auth);
 app.route('/api/events', events);
 app.route('/api', api);
