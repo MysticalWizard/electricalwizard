@@ -38,6 +38,9 @@ pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# local docs
+/docs/
+
 # runtime
 backups/
 exports/
