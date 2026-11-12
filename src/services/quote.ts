@@ -74,16 +74,42 @@ export async function getQuoteByNumber(
 }
 
 /**
- * Get random quotes from a guild
+ * Get random quotes from a guild. `$sample` after a `$match` reads every
+ * matching quote, so each pick instead starts at a random quote number and
+ * takes the next quote at or after it (wrapping around), using the
+ * { guildId, quoteNumber } index. A quote that follows a gap left by deleted
+ * quotes is a little more likely to come up.
  */
 export async function getRandomQuotes(
   guildId: string,
   count: number = 1,
 ): Promise<IQuote[]> {
-  return Quote.aggregate([
-    { $match: { guildId } },
-    { $sample: { size: count } },
-  ]);
+  const highest = await Quote.findOne({ guildId }, { quoteNumber: 1 })
+    .sort({ quoteNumber: -1 })
+    .lean();
+  if (!highest) return [];
+
+  const picked: IQuote[] = [];
+  const pickedNumbers: number[] = [];
+  while (picked.length < count) {
+    const start = 1 + Math.floor(Math.random() * highest.quoteNumber);
+    const notPicked = { $nin: pickedNumbers };
+    const quote =
+      (await Quote.findOne({
+        guildId,
+        quoteNumber: { $gte: start, ...notPicked },
+      })
+        .sort({ quoteNumber: 1 })
+        .lean()) ??
+      (await Quote.findOne({ guildId, quoteNumber: notPicked })
+        .sort({ quoteNumber: 1 })
+        .lean());
+    // Every quote has been picked
+    if (!quote) break;
+    picked.push(quote);
+    pickedNumbers.push(quote.quoteNumber);
+  }
+  return picked;
 }
 
 /**
