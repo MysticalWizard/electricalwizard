@@ -5,6 +5,8 @@ export interface DbChangeEvent {
   model: string;
   action: ChangeAction;
   id?: string | undefined;
+  /** Owners of the changed records (see ChangeEntry); not sent to browsers. */
+  userIds?: string[] | undefined;
   timestamp: number;
 }
 
@@ -15,8 +17,15 @@ export function emitDbChange(
   model: string,
   action: ChangeAction,
   id?: string,
+  userIds?: string[],
 ): void {
-  bus.emit('db:change', { model, action, id, timestamp: Date.now() });
+  bus.emit('db:change', {
+    model,
+    action,
+    id,
+    userIds,
+    timestamp: Date.now(),
+  });
 }
 
 export { bus as eventBus };

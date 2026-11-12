@@ -17,7 +17,7 @@ async function main() {
   // Forward writes from both processes to dashboard clients.
   void watchChangeFeed((entry) => {
     const key = registryKeyFor(entry.model) ?? EXTRA_KEYS[entry.model];
-    if (key) emitDbChange(key, entry.action, entry.id);
+    if (key) emitDbChange(key, entry.action, entry.id, entry.userIds);
   });
 }
 

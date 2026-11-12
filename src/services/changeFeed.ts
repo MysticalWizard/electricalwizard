@@ -15,6 +15,11 @@ export interface ChangeEntry {
   model: string;
   action: ChangeAction;
   id?: string | undefined;
+  /**
+   * Discord IDs of the users who own the changed records, for models whose
+   * records belong to one user. Absent when the write didn't say.
+   */
+  userIds?: string[] | undefined;
   at: Date;
 }
 
@@ -62,12 +67,18 @@ export async function ensureChangeFeed(): Promise<void> {
   }
 }
 
-function publish(model: string, action: ChangeAction, id?: unknown): void {
+function publish(
+  model: string,
+  action: ChangeAction,
+  id?: unknown,
+  userIds?: string[],
+): void {
   // Omit `id` rather than setting it to undefined, which the driver stores as null.
   const entry: ChangeEntry = {
     model,
     action,
     ...(id == null ? {} : { id: String(id) }),
+    ...(userIds?.length ? { userIds } : {}),
     at: new Date(),
   };
   // Notifications are best-effort: never fail the write that triggered them.
@@ -84,31 +95,72 @@ function idOf(result: unknown): unknown {
     : undefined;
 }
 
+/** The distinct strings among `values`. */
+function ownerIds(...values: unknown[]): string[] {
+  return [...new Set(values.filter((v): v is string => typeof v === 'string'))];
+}
+
+export interface ChangeFeedOptions {
+  /**
+   * Field holding the Discord ID of the user each record belongs to. Entries
+   * then carry the owner, so the dashboard can tell only that user (and the
+   * bot owner) about changes to private records. Query writes report it when
+   * their filter matches it by value.
+   */
+  ownerField?: string;
+}
+
 /**
  * Mongoose plugin that publishes every write made through the model's
  * document and query methods to the change feed.
  */
-export function changeFeedPlugin(schema: Schema): void {
+export function changeFeedPlugin(
+  schema: Schema,
+  options: ChangeFeedOptions = {},
+): void {
+  const { ownerField } = options;
+  const ownerOf = (value: unknown): unknown =>
+    ownerField && value && typeof value === 'object'
+      ? (value as Record<string, unknown>)[ownerField]
+      : undefined;
+
   schema.pre('save', function () {
     this.$locals.wasNew = this.isNew;
   });
 
   schema.post('save', function (doc) {
     const { modelName } = doc.constructor as Model<unknown>;
-    publish(modelName, doc.$locals.wasNew ? 'create' : 'update', doc._id);
+    publish(
+      modelName,
+      doc.$locals.wasNew ? 'create' : 'update',
+      doc._id,
+      ownerIds(ownerField ? doc.get(ownerField) : undefined),
+    );
   });
 
   schema.post(
     ['findOneAndUpdate', 'updateOne', 'updateMany'],
     function (result: unknown) {
-      publish(this.model.modelName, 'update', idOf(result));
+      // A findOneAndUpdate returns the document; include its owner too, in
+      // case the update changed it
+      publish(
+        this.model.modelName,
+        'update',
+        idOf(result),
+        ownerIds(ownerOf(this.getFilter()), ownerOf(result)),
+      );
     },
   );
 
   schema.post(
     ['findOneAndDelete', 'deleteOne', 'deleteMany'],
     function (result: unknown) {
-      publish(this.model.modelName, 'delete', idOf(result));
+      publish(
+        this.model.modelName,
+        'delete',
+        idOf(result),
+        ownerIds(ownerOf(this.getFilter()), ownerOf(result)),
+      );
     },
   );
 }

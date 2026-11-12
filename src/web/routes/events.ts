@@ -17,15 +17,23 @@ const MAX_STREAMS_PER_USER = 10;
 const openStreams = new Map<string, number>();
 
 /**
- * The event as `session` may see it. Members only see their own private
- * records, so they aren't told which of them changed.
+ * The event as `session` may see it, or null if they shouldn't hear of it.
+ * Changes to a private model's records go only to the users who own them and
+ * to the bot owner, who can see every record (as in routes/api.ts).
  */
-function visibleTo(session: Session, event: DbChangeEvent): DbChangeEvent {
-  if (session.role !== 'member' || !modelRegistry[event.model]?.hasPrivacy) {
-    return event;
+function visibleTo(
+  session: Session,
+  event: DbChangeEvent,
+): DbChangeEvent | null {
+  const { userIds, ...visible } = event;
+  if (
+    !modelRegistry[event.model]?.hasPrivacy ||
+    session.role === 'owner' ||
+    userIds?.includes(session.userId)
+  ) {
+    return visible;
   }
-  const { model, action, timestamp } = event;
-  return { model, action, timestamp };
+  return null;
 }
 
 const events = new Hono<AuthEnv>();
@@ -60,11 +68,10 @@ events.get('/', requireAuth, (c) => {
     await stream.writeSSE({ event: 'ready', data: '' });
 
     const onDbChange = (data: DbChangeEvent) => {
+      const event = visibleTo(session, data);
+      if (!event) return;
       stream
-        .writeSSE({
-          event: 'db:change',
-          data: JSON.stringify(visibleTo(session, data)),
-        })
+        .writeSSE({ event: 'db:change', data: JSON.stringify(event) })
         .catch(() => {});
     };
 

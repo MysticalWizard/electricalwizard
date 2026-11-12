@@ -145,6 +145,14 @@ export async function getDDaysForAutocomplete(
   }));
 }
 
+/**
+ * Filter for one D-Day. It names the owner as well as the ID so the change
+ * feed can tell the owner's dashboard about the write.
+ */
+function ownFilter(dday: IDDay) {
+  return { _id: dday._id, userId: dday.userId };
+}
+
 /** Not waiting to retry a failed notification. */
 function notRetrying(now: Date) {
   return { retryAt: { $not: { $gt: now } } };
@@ -179,13 +187,10 @@ function followingNotifyAt(dday: IDDay): Date | null {
 
 /** Schedule the next notification once the due one has been sent. */
 export async function markDDayNotified(dday: IDDay): Promise<void> {
-  await DDay.updateOne(
-    { _id: dday._id },
-    {
-      $set: { nextNotifyAt: followingNotifyAt(dday), deliveryAttempts: 0 },
-      $unset: { retryAt: 1 },
-    },
-  );
+  await DDay.updateOne(ownFilter(dday), {
+    $set: { nextNotifyAt: followingNotifyAt(dday), deliveryAttempts: 0 },
+    $unset: { retryAt: 1 },
+  });
 }
 
 /**
@@ -202,10 +207,9 @@ export async function markDDayNotifyFailed(
     await markDDayNotified(dday);
     return true;
   }
-  await DDay.updateOne(
-    { _id: dday._id },
-    { $set: { deliveryAttempts: attempts, retryAt } },
-  );
+  await DDay.updateOne(ownFilter(dday), {
+    $set: { deliveryAttempts: attempts, retryAt },
+  });
   return false;
 }
 
@@ -232,10 +236,9 @@ export async function processCompletedDDays(): Promise<IDDay[]> {
       const newTargetDate = new Date(dday.targetDate);
       newTargetDate.setFullYear(newTargetDate.getFullYear() + 1);
 
-      await DDay.updateOne(
-        { _id: dday._id },
-        { $set: { targetDate: newTargetDate } },
-      );
+      await DDay.updateOne(ownFilter(dday), {
+        $set: { targetDate: newTargetDate },
+      });
     } else if (dday.completionNotified) {
       await markDDayCompleted(dday);
     } else {
@@ -251,18 +254,15 @@ export async function markDDayCompleted(
   dday: IDDay,
   notified = true,
 ): Promise<void> {
-  await DDay.updateOne(
-    { _id: dday._id },
-    {
-      $set: {
-        completed: true,
-        nextNotifyAt: null,
-        completionNotified: notified || dday.completionNotified,
-        deliveryAttempts: 0,
-      },
-      $unset: { retryAt: 1 },
+  await DDay.updateOne(ownFilter(dday), {
+    $set: {
+      completed: true,
+      nextNotifyAt: null,
+      completionNotified: notified || dday.completionNotified,
+      deliveryAttempts: 0,
     },
-  );
+    $unset: { retryAt: 1 },
+  });
 }
 
 /**
@@ -280,10 +280,9 @@ export async function markDDayCompletionFailed(
     await markDDayCompleted(dday, false);
     return true;
   }
-  await DDay.updateOne(
-    { _id: dday._id },
-    { $set: { deliveryAttempts: attempts, retryAt } },
-  );
+  await DDay.updateOne(ownFilter(dday), {
+    $set: { deliveryAttempts: attempts, retryAt },
+  });
   return false;
 }
 

@@ -62,6 +62,7 @@ const reminderSchema = new Schema<IReminder>(
 reminderSchema.index({ triggerAt: 1 });
 reminderSchema.index({ userId: 1, guildId: 1 });
 
-reminderSchema.plugin(changeFeedPlugin);
+// Private records: only their owner is told about changes
+reminderSchema.plugin(changeFeedPlugin, { ownerField: 'userId' });
 
 export const Reminder = model<IReminder>('Reminder', reminderSchema);

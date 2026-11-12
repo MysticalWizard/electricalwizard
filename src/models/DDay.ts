@@ -94,6 +94,7 @@ ddaySchema.index({ userId: 1, guildId: 1 });
 // poll doesn't scan the ever-growing set of completed D-Days
 ddaySchema.index({ completed: 1, targetDate: 1 });
 
-ddaySchema.plugin(changeFeedPlugin);
+// Private records: only their owner is told about changes
+ddaySchema.plugin(changeFeedPlugin, { ownerField: 'userId' });
 
 export const DDay = model<IDDay>('DDay', ddaySchema);

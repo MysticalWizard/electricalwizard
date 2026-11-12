@@ -65,6 +65,14 @@ export async function cancelReminder(
 }
 
 /**
+ * Filter for one reminder. It names the owner as well as the ID so the change
+ * feed can tell the owner's dashboard about the write.
+ */
+function ownFilter(reminder: IReminder) {
+  return { _id: reminder._id, userId: reminder.userId };
+}
+
+/**
  * Reminders that are due, skipping any waiting to retry a failed delivery.
  * They stay in the database until sent (see markReminderSent), so a failed
  * send or a crash mid-tick doesn't lose them. This assumes a single scheduler
@@ -80,7 +88,7 @@ export async function getDueReminders(): Promise<IReminder[]> {
 
 /** Remove a reminder once it has been delivered. */
 export async function markReminderSent(reminder: IReminder): Promise<void> {
-  await Reminder.deleteOne({ _id: reminder._id });
+  await Reminder.deleteOne(ownFilter(reminder));
 }
 
 /**
@@ -94,13 +102,12 @@ export async function markReminderFailed(
 ): Promise<boolean> {
   const attempts = (reminder.deliveryAttempts ?? 0) + 1;
   if (attempts >= maxAttempts) {
-    await Reminder.deleteOne({ _id: reminder._id });
+    await Reminder.deleteOne(ownFilter(reminder));
     return true;
   }
-  await Reminder.updateOne(
-    { _id: reminder._id },
-    { $set: { deliveryAttempts: attempts, retryAt } },
-  );
+  await Reminder.updateOne(ownFilter(reminder), {
+    $set: { deliveryAttempts: attempts, retryAt },
+  });
   return false;
 }
 
