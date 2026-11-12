@@ -1,24 +1,15 @@
 'use client';
 
-import { useAuth } from '@/hooks/use-auth';
 import { useSSE } from '@/hooks/use-sse';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 
+// The page renders while /auth/me is still loading, so its own queries start
+// at the same time instead of a round trip later. The API enforces the role
+// on every request (and a 401 sends the user to /login), so nothing depends
+// on knowing the role first; role-dependent controls appear once it arrives.
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { loading } = useAuth();
   useSSE();
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen text-muted-foreground">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <span className="text-sm">Loading...</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-screen">

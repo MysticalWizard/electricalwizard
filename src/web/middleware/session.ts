@@ -141,6 +141,24 @@ function readSession(token: string): Session | null {
 // streams for one session share a single call to Discord
 const pendingChecks = new Map<string, Promise<Session | null>>();
 
+// The last successful re-check per access token. Each open event stream holds
+// its own copy of the session, and a stream can't rewrite the cookie, so
+// without this every stream and the next request would each ask Discord.
+interface RecentCheck {
+  role: Role;
+  checkedAt: number;
+}
+const recentChecks = new Map<string, RecentCheck>();
+
+function rememberCheck(accessToken: string, check: RecentCheck): void {
+  recentChecks.set(accessToken, check);
+  if (recentChecks.size < 100) return;
+  const cutoff = Date.now() - RECHECK_MS;
+  for (const [token, { checkedAt }] of recentChecks) {
+    if (checkedAt < cutoff) recentChecks.delete(token);
+  }
+}
+
 // Tokens of sessions logged out of, so copies of those cookies stop working at
 // once rather than at their next re-check. Kept until the session would have
 // expired anyway.
@@ -171,6 +189,18 @@ export async function refreshSession(
 
 async function recheck(session: Session): Promise<Session | null> {
   const now = Date.now();
+
+  // Another stream or request for this token confirmed it recently
+  const recent = recentChecks.get(session.accessToken);
+  if (recent && now - recent.checkedAt < RECHECK_MS) {
+    return {
+      ...session,
+      role: recent.role,
+      checkedAt: recent.checkedAt,
+      recheckAt: recent.checkedAt + RECHECK_MS,
+    };
+  }
+
   let member;
   try {
     member = await getGuildMember(session.accessToken);
@@ -180,13 +210,13 @@ async function recheck(session: Session): Promise<Session | null> {
     if (now - session.checkedAt >= MAX_UNCHECKED_MS) return null;
     return { ...session, recheckAt: now + RETRY_MS };
   }
-  if (!member.isMember) return null;
-  return {
-    ...session,
-    role: roleFor(session.userId, member.isAdmin),
-    checkedAt: now,
-    recheckAt: now + RECHECK_MS,
-  };
+  if (!member.isMember) {
+    recentChecks.delete(session.accessToken);
+    return null;
+  }
+  const role = roleFor(session.userId, member.isAdmin);
+  rememberCheck(session.accessToken, { role, checkedAt: now });
+  return { ...session, role, checkedAt: now, recheckAt: now + RECHECK_MS };
 }
 
 /**
@@ -217,6 +247,7 @@ export async function endSession(c: Context): Promise<void> {
 
   const { accessToken } = session;
   loggedOut.add(accessToken);
+  recentChecks.delete(accessToken);
   setTimeout(
     () => loggedOut.delete(accessToken),
     session.exp - Date.now(),
