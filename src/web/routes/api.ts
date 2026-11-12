@@ -334,6 +334,12 @@ api.post('/:model', async (c) => {
     filtered.guildId = config.guildId;
   }
 
+  // Only the owner may create a private record for someone else; for anyone
+  // else it belongs to them
+  if (def.hasPrivacy && def.ownerField && !seesAllPrivate(session)) {
+    filtered[def.ownerField] = session.userId;
+  }
+
   const doc = await def.model.create(filtered);
   return c.json(doc, 201);
 });
@@ -349,7 +355,7 @@ api.put('/:model/:id', async (c) => {
   }
 
   // Ownership check for models with privacy
-  if (def.hasPrivacy && def.ownerField && session.role !== 'owner') {
+  if (def.hasPrivacy && def.ownerField && !seesAllPrivate(session)) {
     const existing = await def.model.findById(c.req.param('id')).lean();
     if (!existing) return c.json({ error: 'Not found' }, 404);
     const ownerValue = (existing as Record<string, unknown>)[def.ownerField];
@@ -362,11 +368,17 @@ api.put('/:model/:id', async (c) => {
   if (!sanitize(body)) return c.json({ error: 'Invalid input' }, 400);
 
   const filtered = filterFields(modelName, body);
+  // Only the owner may hand a private record to someone else
+  if (def.hasPrivacy && def.ownerField && !seesAllPrivate(session)) {
+    delete filtered[def.ownerField];
+  }
   const badId = invalidIdField(modelName, filtered);
   if (badId) return c.json({ error: `${badId} must be a Discord ID` }, 400);
 
+  // Validators (required, enum, maxlength) don't run on updates by default
   const doc = await def.model.findByIdAndUpdate(c.req.param('id'), filtered, {
     returnDocument: 'after',
+    runValidators: true,
   });
   if (!doc) return c.json({ error: 'Not found' }, 404);
 
@@ -384,7 +396,7 @@ api.delete('/:model/:id', async (c) => {
   }
 
   // Ownership check for models with privacy
-  if (def.hasPrivacy && def.ownerField && session.role !== 'owner') {
+  if (def.hasPrivacy && def.ownerField && !seesAllPrivate(session)) {
     const existing = await def.model.findById(c.req.param('id')).lean();
     if (!existing) return c.json({ error: 'Not found' }, 404);
     const ownerValue = (existing as Record<string, unknown>)[def.ownerField];
