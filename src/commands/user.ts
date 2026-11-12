@@ -9,7 +9,7 @@ import type { SlashCommand } from '#/types.js';
 import { colors, createEmbed } from '#/utils/embeds.js';
 import { getSupportedTimezones, validateTimezone } from '#/utils/timezone.js';
 import { formatFullName } from '#/utils/formatName.js';
-import { requireGuild } from '#/utils/guards.js';
+import { requireAdmin, requireGuild } from '#/utils/guards.js';
 import { respondTimezoneAutocomplete } from '#/utils/autocomplete.js';
 import { User } from '#/models/User.js';
 
@@ -67,6 +67,7 @@ export const command: SlashCommand = {
 
   async execute(interaction: ChatInputCommandInteraction) {
     if (!(await requireGuild(interaction))) return;
+    if (!(await requireAdmin(interaction))) return;
 
     const subcommand = interaction.options.getSubcommand();
 

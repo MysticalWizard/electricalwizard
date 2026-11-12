@@ -24,6 +24,24 @@ export async function requireGuild(
 }
 
 /**
+ * Guard for admin-only commands. Their default permission is a setting server
+ * admins can override per role or user, so it is checked again here. Replies
+ * with an ephemeral error and returns false if the user isn't an admin.
+ */
+export async function requireAdmin(
+  interaction: ChatInputCommandInteraction,
+): Promise<boolean> {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+    await interaction.reply({
+      content: 'You need the Administrator permission to use this command.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return false;
+  }
+  return true;
+}
+
+/**
  * Check if a guild member has Administrator permission.
  */
 export function isAdmin(member: GuildMember): boolean {

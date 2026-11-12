@@ -8,6 +8,7 @@ import { Bot } from '#/models/Bot.js';
 import { BotStatus, BotActivityType } from '#/enums.js';
 import { config } from '#/config.js';
 import { colors, createEmbed } from '#/utils/embeds.js';
+import { requireAdmin } from '#/utils/guards.js';
 
 export const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -46,6 +47,8 @@ export const command: SlashCommand = {
     ) as SlashCommandBuilder,
 
   async execute(interaction: ChatInputCommandInteraction) {
+    if (!(await requireAdmin(interaction))) return;
+
     const state = interaction.options.getString('state');
     const activity = interaction.options.getString('activity');
     const message = interaction.options.getString('message');
