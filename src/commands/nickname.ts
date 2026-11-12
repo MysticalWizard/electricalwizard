@@ -5,6 +5,7 @@ import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
   type GuildMember,
+  type User,
 } from 'discord.js';
 import type { SlashCommand } from '#/types.js';
 import { colors, createEmbed } from '#/utils/embeds.js';
@@ -18,7 +19,19 @@ import {
   getNicknameOwner,
   setNicknameAnnounce,
   toggleUserNicknameAnnounce,
+  countUserNicknames,
 } from '#/services/nickname.js';
+
+// Short nicknames match inside ordinary messages (`a`, `i`), and every
+// nickname adds to the per-message matching and the reply spam it can cause
+const MIN_LENGTH = 2;
+const MAX_LENGTH = 32;
+const MAX_PER_COMMAND = 10;
+const MAX_PER_USER = 20;
+
+// Users whose nicknames are being added right now, keyed by guild and user.
+// Adds for one user run one at a time so they can't both pass the cap check.
+const addsInProgress = new Set<string>();
 
 export const command: SlashCommand = {
   data: new SlashCommandBuilder()
@@ -38,9 +51,10 @@ export const command: SlashCommand = {
           option
             .setName('nicknames')
             .setDescription(
-              'The nickname(s) to add (comma-separated for multiple)',
+              `The nickname(s) to add (comma-separated, up to ${MAX_PER_COMMAND})`,
             )
-            .setRequired(true),
+            .setRequired(true)
+            .setMaxLength(MAX_PER_COMMAND * (MAX_LENGTH + 2)),
         ),
     )
     .addSubcommand((subcommand) =>
@@ -142,17 +156,69 @@ async function handleAdd(
     return;
   }
 
+  // Case-insensitive duplicates within the input count once
+  const seen = new Set<string>();
   const nicknames = input
     .split(',')
     .map((n) => n.trim())
-    .filter((n) => n.length > 0 && n.length <= 32);
+    .filter((n) => {
+      const key = n.toLowerCase();
+      if (!n || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-  if (nicknames.length === 0) {
+  const invalid = nicknames.filter(
+    (n) => n.length < MIN_LENGTH || n.length > MAX_LENGTH,
+  );
+  if (nicknames.length === 0 || invalid.length > 0) {
     await interaction.reply({
-      content:
-        'No valid nicknames provided. Each nickname must be 1-32 characters.',
+      content: `Each nickname must be ${MIN_LENGTH}-${MAX_LENGTH} characters.`,
       flags: MessageFlags.Ephemeral,
     });
+    return;
+  }
+
+  if (nicknames.length > MAX_PER_COMMAND) {
+    await interaction.reply({
+      content: `You can add up to ${MAX_PER_COMMAND} nicknames at a time.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const guildId = interaction.guild!.id;
+  const addKey = `${guildId}:${user.id}`;
+  if (addsInProgress.has(addKey)) {
+    await interaction.reply({
+      content: `Nicknames are already being added for ${user}. Try again in a moment.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  addsInProgress.add(addKey);
+  try {
+    await addNicknames(interaction, user, nicknames);
+  } finally {
+    addsInProgress.delete(addKey);
+  }
+}
+
+async function addNicknames(
+  interaction: ChatInputCommandInteraction,
+  user: User,
+  nicknames: string[],
+): Promise<void> {
+  // The checks below take a database round trip per nickname
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const guildId = interaction.guild!.id;
+
+  const existing = await countUserNicknames(guildId, user.id);
+  if (existing + nicknames.length > MAX_PER_USER) {
+    await interaction.editReply(
+      `${user} has ${existing} nickname${existing === 1 ? '' : 's'}; each user can have up to ${MAX_PER_USER}.`,
+    );
     return;
   }
 
@@ -160,20 +226,19 @@ async function handleAdd(
   const skipped: string[] = [];
 
   for (const nickname of nicknames) {
-    const exists = await nicknameExists(interaction.guild!.id, nickname);
+    const exists = await nicknameExists(guildId, nickname);
     if (exists) {
       skipped.push(nickname);
     } else {
-      await addNickname(interaction.guild!.id, user.id, nickname);
+      await addNickname(guildId, user.id, nickname);
       added.push(nickname);
     }
   }
 
   if (added.length === 0) {
-    await interaction.reply({
-      content: `All nicknames are already in use: ${skipped.map((n) => `**${n}**`).join(', ')}`,
-      flags: MessageFlags.Ephemeral,
-    });
+    await interaction.editReply(
+      `All nicknames are already in use: ${skipped.map((n) => `**${n}**`).join(', ')}`,
+    );
     return;
   }
 
@@ -191,7 +256,7 @@ async function handleAdd(
     });
   }
 
-  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  await interaction.editReply({ embeds: [embed] });
 }
 
 async function handleRemove(

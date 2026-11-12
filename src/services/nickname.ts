@@ -188,6 +188,14 @@ export async function getUserNicknames(
   return Nickname.find({ guildId, userId }).lean();
 }
 
+/** How many nicknames a user has in a guild. */
+export async function countUserNicknames(
+  guildId: string,
+  userId: string,
+): Promise<number> {
+  return Nickname.countDocuments({ guildId, userId });
+}
+
 /**
  * Get all nicknames in a guild
  */
