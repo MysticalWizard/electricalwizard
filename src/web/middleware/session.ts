@@ -15,7 +15,10 @@ export interface Session {
   userId: string;
   username: string;
   avatar: string | null;
+  /** The role Discord grants, regardless of `viewAsMember`. */
   role: Role;
+  /** An admin or owner previewing the dashboard with member access. */
+  viewAsMember?: boolean | undefined;
   /** Discord OAuth token, used to re-check guild membership and role. */
   accessToken: string;
   /** When membership and role were last confirmed with Discord. */
@@ -77,6 +80,16 @@ function decrypt(token: string): string {
 export function roleFor(userId: string, isAdmin: boolean): Role {
   if (userId === config.ownerId) return 'owner';
   return isAdmin ? 'admin' : 'member';
+}
+
+/**
+ * The session as permission checks should see it: with member access while
+ * an admin or owner is viewing as a member.
+ */
+export function asViewed(session: Session): Session {
+  return session.viewAsMember && session.role !== 'member'
+    ? { ...session, role: 'member' }
+    : session;
 }
 
 export function createSession(

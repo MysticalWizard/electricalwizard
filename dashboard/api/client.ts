@@ -34,3 +34,12 @@ export async function api<T>(path: string, opts?: RequestInit): Promise<T> {
 export function fetchMe(): Promise<SessionUser> {
   return api<SessionUser>('/auth/me');
 }
+
+export function setViewAsMember(
+  enabled: boolean,
+): Promise<{ viewAsMember: boolean }> {
+  return api('/auth/view-as-member', {
+    method: 'POST',
+    body: JSON.stringify({ enabled }),
+  });
+}

@@ -10,6 +10,7 @@ import {
   getGuildMember,
 } from '../utils/discord.js';
 import {
+  asViewed,
   createSession,
   setSession,
   getSession,
@@ -103,8 +104,34 @@ auth.get('/me', async (c) => {
     userId: session.userId,
     username: session.username,
     avatar: session.avatar,
-    role: session.role,
+    role: asViewed(session).role,
+    actualRole: session.role,
+    viewAsMember: asViewed(session) !== session,
   });
+});
+
+// Lets an admin or owner see the dashboard with member access. The flag lives
+// in the session, so the API enforces it rather than only the UI.
+auth.post('/view-as-member', async (c) => {
+  const session = await getSession(c);
+  if (!session) return c.text('Unauthorized', 401);
+  if (session.role === 'member') {
+    return c.text('Forbidden — admins and owners only', 403);
+  }
+
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.text('Invalid JSON body', 400);
+  }
+  const enabled = (body as { enabled?: unknown } | null)?.enabled;
+  if (typeof enabled !== 'boolean') {
+    return c.text('`enabled` must be a boolean', 400);
+  }
+
+  setSession(c, { ...session, viewAsMember: enabled });
+  return c.json({ viewAsMember: enabled });
 });
 
 export { auth };

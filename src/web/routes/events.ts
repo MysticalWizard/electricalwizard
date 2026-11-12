@@ -1,7 +1,11 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
-import { refreshSession, type Session } from '../middleware/session.js';
+import {
+  asViewed,
+  refreshSession,
+  type Session,
+} from '../middleware/session.js';
 import { eventBus, type DbChangeEvent } from '../utils/eventBus.js';
 import { modelRegistry } from '../utils/models.js';
 
@@ -54,7 +58,7 @@ events.get('/', requireAuth, (c) => {
     const heartbeat = setInterval(() => {
       void refreshSession(session).then((current) => {
         if (!current) return end();
-        session = current;
+        session = asViewed(current);
         stream.writeSSE({ event: 'heartbeat', data: '' }).catch(() => {});
       });
     }, HEARTBEAT_MS);

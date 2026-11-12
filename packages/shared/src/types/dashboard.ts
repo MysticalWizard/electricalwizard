@@ -5,7 +5,11 @@ export interface SessionUser {
   userId: string;
   username: string;
   avatar: string | null;
+  /** The role in effect: `member` while viewing as a member. */
   role: UserRole;
+  /** The role Discord grants, regardless of viewing as a member. */
+  actualRole: UserRole;
+  viewAsMember: boolean;
 }
 
 export interface FieldDef {
