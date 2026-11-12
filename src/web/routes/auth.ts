@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { randomBytes } from 'node:crypto';
 import { config } from '#/config.js';
@@ -17,6 +17,7 @@ import {
   endSession,
   roleFor,
 } from '../middleware/session.js';
+import { KeyedRateLimiter, RateLimiter } from '../utils/rateLimit.js';
 
 const auth = new Hono();
 
@@ -43,6 +44,24 @@ auth.get('/login', (c) => {
   return c.redirect(getAuthUrl(state));
 });
 
+// Anyone can reach the callback with a made-up code, and each attempt sends a
+// token request to Discord, which blocks IPs that make too many bad requests
+// (the bot shares this one). Each client gets a few attempts a minute, and a
+// higher cap across all clients holds if many addresses are used. The client
+// limit is checked first, so one client can't use up everyone's attempts.
+const tokenExchangesPerClient = new KeyedRateLimiter(5, 60_000);
+const tokenExchanges = new RateLimiter(30, 60_000);
+
+/**
+ * The visitor's address. The API is reached only through the dashboard's
+ * Next server, which passes X-Forwarded-For on unchanged, so its last entry
+ * is the one the reverse proxy in front added. Earlier entries come from the
+ * client and can be anything.
+ */
+function clientAddress(c: Context): string {
+  return c.req.header('x-forwarded-for')?.split(',').at(-1)?.trim() || 'direct';
+}
+
 auth.get('/callback', async (c) => {
   const code = c.req.query('code');
   const state = c.req.query('state');
@@ -53,6 +72,12 @@ auth.get('/callback', async (c) => {
 
   if (!code || !state || state !== storedState) {
     return c.text('Invalid OAuth state', 400);
+  }
+  if (
+    !tokenExchangesPerClient.tryTake(clientAddress(c)) ||
+    !tokenExchanges.tryTake()
+  ) {
+    return c.text('Too many login attempts. Try again in a minute.', 429);
   }
 
   try {
