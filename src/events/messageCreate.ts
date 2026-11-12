@@ -1,7 +1,7 @@
 import { Events, type Message, type MessageMentionOptions } from 'discord.js';
 import type { Event } from '#/types.js';
 import { findNicknameMatches } from '#/services/nickname.js';
-import { addQuote } from '#/services/quote.js';
+import { addQuote, findDuplicateQuote } from '#/services/quote.js';
 import {
   translateText,
   getFlagForLang,
@@ -23,6 +23,8 @@ const TRANSLATE_REGEX = /^(?:translate|tr|tl)(?:\s+(.+))?$/i;
 // it, so `parse` has to be repeated here.
 const NO_PINGS: MessageMentionOptions = { parse: [], repliedUser: false };
 
+const quoteCooldown = new Cooldown(5_000);
+
 // Each translation is a call to a rate-limited API that can take a while, so
 // a user may start one every few seconds and only a few run at once
 const translateCooldown = new Cooldown(5_000);
@@ -40,6 +42,11 @@ async function handleQuoteReply(
   message: Message<true>,
   context?: string,
 ): Promise<void> {
+  if (quoteCooldown.take(message.author.id) > 0) {
+    await reactTooSoon(message);
+    return;
+  }
+
   try {
     const referencedMessage = await message.channel.messages.fetch(
       message.reference!.messageId!,
@@ -68,6 +75,20 @@ async function handleQuoteReply(
       authorId,
       referencedMessage.author.username,
     );
+
+    const duplicate = await findDuplicateQuote(
+      message.guild.id,
+      referencedMessage.content,
+      authorId,
+      authorName,
+    );
+    if (duplicate) {
+      await message.reply({
+        content: `This quote already exists as #${duplicate.quoteNumber}.`,
+        allowedMentions: NO_PINGS,
+      });
+      return;
+    }
 
     const quote = await addQuote({
       guildId: message.guild.id,
