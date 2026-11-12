@@ -1,3 +1,4 @@
+import { publishChange } from '#/services/changeFeed.js';
 import { DDay, type IDDay, type ReminderFrequency } from '#/models/DDay.js';
 import { escapeRegex } from '#/utils/regex.js';
 
@@ -145,14 +146,6 @@ export async function getDDaysForAutocomplete(
   }));
 }
 
-/**
- * Filter for one D-Day. It names the owner as well as the ID so the change
- * feed can tell the owner's dashboard about the write.
- */
-function ownFilter(dday: IDDay) {
-  return { _id: dday._id, userId: dday.userId };
-}
-
 /** Not waiting to retry a failed notification. */
 function notRetrying(now: Date) {
   return { retryAt: { $not: { $gt: now } } };
@@ -160,8 +153,8 @@ function notRetrying(now: Date) {
 
 /**
  * D-Days due for a notification. Nothing is changed until the notification
- * has been sent (see markDDayNotified), so a failed send or a crash mid-tick
- * doesn't skip it.
+ * has been sent (see recordDDayNotifications), so a failed send or a crash
+ * mid-tick doesn't skip it.
  */
 export async function getDueDDayNotifications(): Promise<IDDay[]> {
   const now = new Date();
@@ -185,39 +178,71 @@ function followingNotifyAt(dday: IDDay): Date | null {
   );
 }
 
-/** Schedule the next notification once the due one has been sent. */
-export async function markDDayNotified(dday: IDDay): Promise<void> {
-  await DDay.updateOne(ownFilter(dday), {
-    $set: { nextNotifyAt: followingNotifyAt(dday), deliveryAttempts: 0 },
-    $unset: { retryAt: 1 },
-  });
+type DDayUpdate = {
+  $set: Record<string, unknown>;
+  $unset?: Record<string, 1>;
+};
+
+/** Apply one update per D-Day in a single write, and announce it. */
+async function updateEach(
+  updates: Array<{ dday: IDDay; update: DDayUpdate }>,
+): Promise<void> {
+  if (updates.length === 0) return;
+  await DDay.bulkWrite(
+    updates.map(({ dday, update }) => ({
+      updateOne: { filter: { _id: dday._id }, update },
+    })),
+    { ordered: false },
+  );
+  // bulkWrite bypasses the change feed plugin
+  publishChange(
+    DDay.modelName,
+    'update',
+    updates.map(({ dday }) => dday.userId),
+  );
+}
+
+/** Clear a failed delivery's retry state along with `$set`. */
+function delivered($set: Record<string, unknown>): DDayUpdate {
+  return { $set: { ...$set, deliveryAttempts: 0 }, $unset: { retryAt: 1 } };
+}
+
+/** Schedule another try of a failed delivery. */
+function retry(attempts: number, retryAt: Date): DDayUpdate {
+  return { $set: { deliveryAttempts: attempts, retryAt } };
 }
 
 /**
- * Record a failed notification: try again at `retryAt`, or skip it once it
- * has failed `maxAttempts` times. Returns true if it was skipped.
+ * Record a round of notifications in one write: sent ones move on to the
+ * next scheduled notification, and failed ones are tried again at `retryAt`,
+ * or skipped once they have failed `maxAttempts` times.
  */
-export async function markDDayNotifyFailed(
-  dday: IDDay,
+export async function recordDDayNotifications(
+  sent: IDDay[],
+  failed: IDDay[],
   maxAttempts: number,
   retryAt: Date,
-): Promise<boolean> {
-  const attempts = (dday.deliveryAttempts ?? 0) + 1;
-  if (attempts >= maxAttempts) {
-    await markDDayNotified(dday);
-    return true;
-  }
-  await DDay.updateOne(ownFilter(dday), {
-    $set: { deliveryAttempts: attempts, retryAt },
+): Promise<void> {
+  const advance = (dday: IDDay) => ({
+    dday,
+    update: delivered({ nextNotifyAt: followingNotifyAt(dday) }),
   });
-  return false;
+  await updateEach([
+    ...sent.map(advance),
+    ...failed.map((dday) => {
+      const attempts = (dday.deliveryAttempts ?? 0) + 1;
+      return attempts >= maxAttempts
+        ? advance(dday)
+        : { dday, update: retry(attempts, retryAt) };
+    }),
+  ]);
 }
 
 /**
  * Handle D-Days whose target date has passed. Recurring ones roll forward a
  * year, and ones already notified are marked completed. Returns the rest,
  * which need a completion notice before they are marked completed (see
- * markDDayCompleted).
+ * recordDDayCompletions).
  */
 export async function processCompletedDDays(): Promise<IDDay[]> {
   const now = new Date();
@@ -228,6 +253,7 @@ export async function processCompletedDDays(): Promise<IDDay[]> {
     ...notRetrying(now),
   }).lean();
 
+  const updates: Array<{ dday: IDDay; update: DDayUpdate }> = [];
   const toNotify: IDDay[] = [];
 
   for (const dday of passedDDays) {
@@ -235,55 +261,52 @@ export async function processCompletedDDays(): Promise<IDDay[]> {
       // For recurring D-Days, reset target date to next year
       const newTargetDate = new Date(dday.targetDate);
       newTargetDate.setFullYear(newTargetDate.getFullYear() + 1);
-
-      await DDay.updateOne(ownFilter(dday), {
-        $set: { targetDate: newTargetDate },
-      });
+      updates.push({ dday, update: { $set: { targetDate: newTargetDate } } });
     } else if (dday.completionNotified) {
-      await markDDayCompleted(dday);
+      updates.push({ dday, update: completion(true) });
     } else {
       toNotify.push(dday);
     }
   }
 
+  await updateEach(updates);
   return toNotify;
 }
 
-/** Mark a passed D-Day completed, after its completion notice was sent. */
-export async function markDDayCompleted(
-  dday: IDDay,
-  notified = true,
-): Promise<void> {
-  await DDay.updateOne(ownFilter(dday), {
-    $set: {
-      completed: true,
-      nextNotifyAt: null,
-      completionNotified: notified || dday.completionNotified,
-      deliveryAttempts: 0,
-    },
-    $unset: { retryAt: 1 },
+/** Mark a passed D-Day completed. */
+function completion(notified: boolean): DDayUpdate {
+  return delivered({
+    completed: true,
+    nextNotifyAt: null,
+    completionNotified: notified,
   });
 }
 
 /**
- * Record a failed completion notice: try again at `retryAt`, or mark the
- * D-Day completed without one once it has failed `maxAttempts` times.
- * Returns true if it gave up.
+ * Record a round of completion notices in one write: D-Days whose notice was
+ * sent are marked completed, and failed ones are tried again at `retryAt`,
+ * or marked completed without a notice once they have failed `maxAttempts`
+ * times.
  */
-export async function markDDayCompletionFailed(
-  dday: IDDay,
+export async function recordDDayCompletions(
+  sent: IDDay[],
+  failed: IDDay[],
   maxAttempts: number,
   retryAt: Date,
-): Promise<boolean> {
-  const attempts = (dday.deliveryAttempts ?? 0) + 1;
-  if (attempts >= maxAttempts) {
-    await markDDayCompleted(dday, false);
-    return true;
-  }
-  await DDay.updateOne(ownFilter(dday), {
-    $set: { deliveryAttempts: attempts, retryAt },
-  });
-  return false;
+): Promise<void> {
+  await updateEach([
+    ...sent.map((dday) => ({ dday, update: completion(true) })),
+    ...failed.map((dday) => {
+      const attempts = (dday.deliveryAttempts ?? 0) + 1;
+      return {
+        dday,
+        update:
+          attempts >= maxAttempts
+            ? completion(false)
+            : retry(attempts, retryAt),
+      };
+    }),
+  ]);
 }
 
 /**

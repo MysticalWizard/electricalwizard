@@ -1,15 +1,14 @@
 import type { Client, EmbedBuilder } from 'discord.js';
+import type { IReminder } from '#/models/Reminder.js';
+import type { IDDay } from '#/models/DDay.js';
 import {
   getDueReminders,
-  markReminderFailed,
-  markReminderSent,
+  recordReminderDeliveries,
 } from '#/services/reminder.js';
 import {
   getDueDDayNotifications,
-  markDDayCompleted,
-  markDDayCompletionFailed,
-  markDDayNotified,
-  markDDayNotifyFailed,
+  recordDDayCompletions,
+  recordDDayNotifications,
   processCompletedDDays,
   calculateDaysUntil,
   formatDDayDisplay,
@@ -158,6 +157,8 @@ async function checkAndSendReminders(client: Client): Promise<void> {
   try {
     // Process regular reminders
     const reminders = await getDueReminders();
+    const sent: IReminder[] = [];
+    const failed: IReminder[] = [];
 
     for (const reminder of reminders) {
       try {
@@ -169,21 +170,23 @@ async function checkAndSendReminders(client: Client): Promise<void> {
           .setFooter({ text: 'Reminder set' });
 
         await deliver(client, reminder, embed);
+        sent.push(reminder);
       } catch (error) {
         console.error(`Failed to send reminder ${reminder._id}:`, error);
-        const gaveUp = await markReminderFailed(
-          reminder,
-          MAX_DELIVERY_ATTEMPTS,
-          nextRetry(),
-        );
-        if (gaveUp) {
-          console.error(
-            `Gave up on reminder ${reminder._id} after ${MAX_DELIVERY_ATTEMPTS} attempts`,
-          );
-        }
-        continue;
+        failed.push(reminder);
       }
-      await markReminderSent(reminder);
+    }
+
+    const dropped = await recordReminderDeliveries(
+      sent,
+      failed,
+      MAX_DELIVERY_ATTEMPTS,
+      nextRetry(),
+    );
+    for (const reminder of dropped) {
+      console.error(
+        `Gave up on reminder ${reminder._id} after ${MAX_DELIVERY_ATTEMPTS} attempts`,
+      );
     }
 
     // Process D-Day notifications
@@ -202,6 +205,8 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
   try {
     // Send due D-Day notifications
     const ddays = await getDueDDayNotifications();
+    const notified: IDDay[] = [];
+    const notifyFailed: IDDay[] = [];
 
     for (const dday of ddays) {
       try {
@@ -230,16 +235,26 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
           );
 
         await deliver(client, dday, embed);
+        notified.push(dday);
       } catch (error) {
         console.error(`Failed to send D-Day notification ${dday._id}:`, error);
-        await markDDayNotifyFailed(dday, MAX_DELIVERY_ATTEMPTS, nextRetry());
-        continue;
+        notifyFailed.push(dday);
       }
-      await markDDayNotified(dday);
     }
+
+    // Written before looking for completed D-Days, so one whose notification
+    // failed waits for its retry
+    await recordDDayNotifications(
+      notified,
+      notifyFailed,
+      MAX_DELIVERY_ATTEMPTS,
+      nextRetry(),
+    );
 
     // Process completed D-Days and send completion notifications
     const completedDDays = await processCompletedDDays();
+    const completionSent: IDDay[] = [];
+    const completionFailed: IDDay[] = [];
 
     for (const dday of completedDDays) {
       try {
@@ -251,20 +266,22 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
           );
 
         await deliver(client, dday, embed);
+        completionSent.push(dday);
       } catch (error) {
         console.error(
           `Failed to send D-Day completion notification ${dday._id}:`,
           error,
         );
-        await markDDayCompletionFailed(
-          dday,
-          MAX_DELIVERY_ATTEMPTS,
-          nextRetry(),
-        );
-        continue;
+        completionFailed.push(dday);
       }
-      await markDDayCompleted(dday);
     }
+
+    await recordDDayCompletions(
+      completionSent,
+      completionFailed,
+      MAX_DELIVERY_ATTEMPTS,
+      nextRetry(),
+    );
   } catch (error) {
     console.error('Error checking D-Day notifications:', error);
   }

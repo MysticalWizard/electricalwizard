@@ -1,4 +1,5 @@
 import { Reminder, type IReminder } from '#/models/Reminder.js';
+import { publishChange } from '#/services/changeFeed.js';
 import { User } from '#/models/User.js';
 import { escapeRegex } from '#/utils/regex.js';
 import { cacheFor } from '#/utils/cacheFor.js';
@@ -66,18 +67,10 @@ export async function cancelReminder(
 }
 
 /**
- * Filter for one reminder. It names the owner as well as the ID so the change
- * feed can tell the owner's dashboard about the write.
- */
-function ownFilter(reminder: IReminder) {
-  return { _id: reminder._id, userId: reminder.userId };
-}
-
-/**
  * Reminders that are due, skipping any waiting to retry a failed delivery.
- * They stay in the database until sent (see markReminderSent), so a failed
- * send or a crash mid-tick doesn't lose them. This assumes a single scheduler
- * instance.
+ * They stay in the database until sent (see recordReminderDeliveries), so a
+ * failed send or a crash mid-tick doesn't lose them. This assumes a single
+ * scheduler instance.
  */
 export async function getDueReminders(): Promise<IReminder[]> {
   const now = new Date();
@@ -87,29 +80,52 @@ export async function getDueReminders(): Promise<IReminder[]> {
   }).lean();
 }
 
-/** Remove a reminder once it has been delivered. */
-export async function markReminderSent(reminder: IReminder): Promise<void> {
-  await Reminder.deleteOne(ownFilter(reminder));
-}
-
 /**
- * Record a failed delivery: try again at `retryAt`, or drop the reminder once
- * it has failed `maxAttempts` times. Returns true if it was dropped.
+ * Record a round of deliveries in one write: sent reminders are removed, and
+ * failed ones are tried again at `retryAt`, or dropped once they have failed
+ * `maxAttempts` times. Returns the dropped ones.
  */
-export async function markReminderFailed(
-  reminder: IReminder,
+export async function recordReminderDeliveries(
+  sent: IReminder[],
+  failed: IReminder[],
   maxAttempts: number,
   retryAt: Date,
-): Promise<boolean> {
-  const attempts = (reminder.deliveryAttempts ?? 0) + 1;
-  if (attempts >= maxAttempts) {
-    await Reminder.deleteOne(ownFilter(reminder));
-    return true;
+): Promise<IReminder[]> {
+  const attemptsAfter = (r: IReminder) => (r.deliveryAttempts ?? 0) + 1;
+  const dropped = failed.filter((r) => attemptsAfter(r) >= maxAttempts);
+  const retrying = failed.filter((r) => attemptsAfter(r) < maxAttempts);
+  const removed = [...sent, ...dropped];
+  if (removed.length === 0 && retrying.length === 0) return [];
+
+  await Reminder.bulkWrite(
+    [
+      ...removed.map((r) => ({ deleteOne: { filter: { _id: r._id } } })),
+      ...retrying.map((r) => ({
+        updateOne: {
+          filter: { _id: r._id },
+          update: { $set: { deliveryAttempts: attemptsAfter(r), retryAt } },
+        },
+      })),
+    ],
+    { ordered: false },
+  );
+
+  // bulkWrite bypasses the change feed plugin
+  if (removed.length > 0) {
+    publishChange(
+      Reminder.modelName,
+      'delete',
+      removed.map((r) => r.userId),
+    );
   }
-  await Reminder.updateOne(ownFilter(reminder), {
-    $set: { deliveryAttempts: attempts, retryAt },
-  });
-  return false;
+  if (retrying.length > 0) {
+    publishChange(
+      Reminder.modelName,
+      'update',
+      retrying.map((r) => r.userId),
+    );
+  }
+  return dropped;
 }
 
 /**

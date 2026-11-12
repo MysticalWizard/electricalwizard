@@ -89,6 +89,19 @@ function publish(
     });
 }
 
+/**
+ * Announce writes that bypass Mongoose middleware (such as bulkWrite), which
+ * the plugin can't see. `userIds` are the owners of the changed records, for
+ * models that have them.
+ */
+export function publishChange(
+  model: string,
+  action: ChangeAction,
+  userIds?: string[],
+): void {
+  publish(model, action, undefined, userIds && [...new Set(userIds)]);
+}
+
 function idOf(result: unknown): unknown {
   return result && typeof result === 'object' && '_id' in result
     ? result._id
