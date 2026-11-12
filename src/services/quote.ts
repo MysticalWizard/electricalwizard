@@ -6,7 +6,6 @@ import {
 } from '#/models/Quote.js';
 import { User } from '#/models/User.js';
 import { formatNameWithInitials } from '#/utils/formatName.js';
-import { escapeRegex } from '#/utils/regex.js';
 import { cacheFor } from '#/utils/cacheFor.js';
 
 // Autocomplete runs on every keystroke, so its lists are reused for a minute
@@ -36,16 +35,14 @@ export async function findDuplicateQuote(
     guildId,
     contentKey: quoteContentKey(content),
   };
+  if (authorId) query.authorId = authorId;
 
-  if (authorId) {
-    query.authorId = authorId;
-  } else if (authorName) {
-    query.authorName = {
-      $regex: new RegExp(`^${escapeRegex(authorName)}$`, 'i'),
-    };
-  }
-
-  return Quote.findOne(query).lean();
+  // The indexed lookup leaves only the few quotes with this text; the author
+  // name is compared here, ignoring case, rather than with a regex
+  const candidates = await Quote.find(query).lean();
+  if (authorId || !authorName) return candidates[0] ?? null;
+  const name = authorName.toLowerCase();
+  return candidates.find((q) => q.authorName?.toLowerCase() === name) ?? null;
 }
 
 /**

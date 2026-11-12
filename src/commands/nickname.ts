@@ -227,12 +227,17 @@ async function addNicknames(
   const skipped: string[] = [];
 
   for (const nickname of nicknames) {
-    const exists = await nicknameExists(guildId, nickname);
-    if (exists) {
+    if (await nicknameExists(guildId, nickname)) {
       skipped.push(nickname);
-    } else {
+      continue;
+    }
+    try {
       await addNickname(guildId, user.id, nickname);
       added.push(nickname);
+    } catch (error) {
+      // Someone else added it since the check
+      if ((error as { code?: number }).code !== 11000) throw error;
+      skipped.push(nickname);
     }
   }
 

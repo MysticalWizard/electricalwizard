@@ -4,7 +4,10 @@ import { config } from '#/config.js';
 import { loadCommands, loadEvents } from '#/utils/loaders.js';
 import { connectDatabase } from '#/services/database.js';
 import { watchChangeFeed } from '#/services/changeFeed.js';
-import { invalidateNicknameCache } from '#/services/nickname.js';
+import {
+  backfillNicknameKeys,
+  invalidateNicknameCache,
+} from '#/services/nickname.js';
 import { backfillQuoteContentKeys } from '#/services/quote.js';
 
 const client = new Client({
@@ -37,6 +40,7 @@ async function main() {
   console.log(chalk.bold('⚒ Initializing bot...'));
   await connectDatabase();
   await backfillQuoteContentKeys();
+  await backfillNicknameKeys();
   // Drop cached data when either process writes to the models behind it.
   void watchChangeFeed((entry) => invalidateNicknameCache(entry.model));
   await loadCommands(client);

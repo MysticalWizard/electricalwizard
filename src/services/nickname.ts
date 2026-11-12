@@ -1,7 +1,6 @@
 import { Guild } from '#/models/Guild.js';
-import { Nickname, type INickname } from '#/models/Nickname.js';
+import { Nickname, nicknameKey, type INickname } from '#/models/Nickname.js';
 import { User } from '#/models/User.js';
-import { escapeRegex } from '#/utils/regex.js';
 
 export interface NicknameMatch {
   nickname: string;
@@ -169,7 +168,7 @@ export async function removeNickname(
 ): Promise<boolean> {
   const result = await Nickname.deleteOne({
     guildId,
-    nickname: { $regex: new RegExp(`^${escapeRegex(nickname)}$`, 'i') },
+    nicknameKey: nicknameKey(nickname),
   });
   invalidateNicknameCache(Nickname.modelName);
   return result.deletedCount > 0;
@@ -182,10 +181,10 @@ export async function getNicknameOwner(
   guildId: string,
   nickname: string,
 ): Promise<string | null> {
-  const doc = await Nickname.findOne({
-    guildId,
-    nickname: { $regex: new RegExp(`^${escapeRegex(nickname)}$`, 'i') },
-  }).lean();
+  const doc = await Nickname.findOne(
+    { guildId, nicknameKey: nicknameKey(nickname) },
+    { userId: 1 },
+  ).lean();
   return doc?.userId ?? null;
 }
 
@@ -221,9 +220,9 @@ export async function nicknameExists(
   guildId: string,
   nickname: string,
 ): Promise<boolean> {
-  const existing = await Nickname.findOne({
+  const existing = await Nickname.exists({
     guildId,
-    nickname: { $regex: new RegExp(`^${escapeRegex(nickname)}$`, 'i') },
+    nicknameKey: nicknameKey(nickname),
   });
   return existing !== null;
 }
@@ -268,7 +267,10 @@ export async function toggleUserNicknameAnnounce(
   discordId: string,
   username: string,
 ): Promise<boolean> {
-  const user = await User.findOne({ discordId });
+  const user = await User.findOne(
+    { discordId },
+    { nicknameAnnounce: 1 },
+  ).lean();
   const newState = !(user?.nicknameAnnounce ?? true);
 
   await User.findOneAndUpdate(
@@ -279,4 +281,39 @@ export async function toggleUserNicknameAnnounce(
   invalidateNicknameCache(User.modelName);
 
   return newState;
+}
+
+/**
+ * Fill in nicknameKey for nicknames saved before it existed. Runs at startup
+ * and does nothing once every nickname has one. Writes directly to the
+ * collection, since the field isn't shown on the dashboard. A nickname that
+ * differs only in case from one already keyed is left without a key and
+ * logged, for someone to remove.
+ */
+export async function backfillNicknameKeys(): Promise<void> {
+  const nicknames = await Nickname.find(
+    { nicknameKey: { $exists: false } },
+    { nickname: 1 },
+  ).lean();
+  if (nicknames.length === 0) return;
+
+  try {
+    await Nickname.bulkWrite(
+      nicknames.map((n) => ({
+        updateOne: {
+          filter: { _id: n._id },
+          update: { $set: { nicknameKey: nicknameKey(n.nickname) } },
+        },
+      })),
+      { ordered: false },
+    );
+  } catch (error) {
+    const writeErrors = (error as { writeErrors?: unknown[] }).writeErrors;
+    if (!writeErrors) throw error;
+    console.warn(
+      `${writeErrors.length} nickname(s) duplicate another one apart from case and were left without a key:`,
+      error,
+    );
+  }
+  console.log(`Backfilled nicknameKey for ${nicknames.length} nickname(s)`);
 }

@@ -54,7 +54,7 @@ export const command: SlashCommand = {
     const message = interaction.options.getString('message');
 
     if (!state && !activity && message === null) {
-      const botConfig = await Bot.findOne({ clientId: config.clientId });
+      const botConfig = await Bot.findOne({ clientId: config.clientId }).lean();
 
       const embed = createEmbed()
         .setTitle('Bot Status')

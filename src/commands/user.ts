@@ -183,7 +183,7 @@ async function handleGet(
 ): Promise<void> {
   const user = interaction.options.getUser('user', true);
 
-  const dbUser = await User.findOne({ discordId: user.id });
+  const dbUser = await User.findOne({ discordId: user.id }).lean();
 
   if (!dbUser) {
     await interaction.reply({
