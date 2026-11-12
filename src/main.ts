@@ -16,6 +16,9 @@ const client = new Client({
   ],
   // Reply to a deleted message as a plain message instead of failing
   failIfNotExists: false,
+  // Replies that echo user text (quotes, teams) must not ping anyone named
+  // in it. Messages that do ping pass their own allow-list.
+  allowedMentions: { parse: [] },
 });
 
 client.on('error', (error) => {

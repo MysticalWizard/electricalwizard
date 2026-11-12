@@ -1,4 +1,4 @@
-import { Events, type Message } from 'discord.js';
+import { Events, type Message, type MessageMentionOptions } from 'discord.js';
 import type { Event } from '#/types.js';
 import { findNicknameMatches } from '#/services/nickname.js';
 import { addQuote } from '#/services/quote.js';
@@ -17,6 +17,11 @@ import { createEmbed } from '#/utils/embeds.js';
 const QUOTE_REGEX = /^quote(?:\s+(.+))?$/i;
 const TRANSLATE_REGEX = /^(?:translate|tr|tl)(?:\s+(.+))?$/i;
 
+// Replies echo other people's text, so nothing in them may ping anyone. A
+// per-message value replaces the client's default rather than merging with
+// it, so `parse` has to be repeated here.
+const NO_PINGS: MessageMentionOptions = { parse: [], repliedUser: false };
+
 async function handleQuoteReply(
   message: Message<true>,
   context?: string,
@@ -29,7 +34,7 @@ async function handleQuoteReply(
     if (referencedMessage.author.bot) {
       await message.reply({
         content: "I can't quote bot messages.",
-        allowedMentions: { repliedUser: false },
+        allowedMentions: NO_PINGS,
       });
       return;
     }
@@ -37,7 +42,7 @@ async function handleQuoteReply(
     if (!referencedMessage.content.trim()) {
       await message.reply({
         content: 'That message has no text content to quote.',
-        allowedMentions: { repliedUser: false },
+        allowedMentions: NO_PINGS,
       });
       return;
     }
@@ -76,13 +81,13 @@ async function handleQuoteReply(
 
     await message.reply({
       content: response,
-      allowedMentions: { repliedUser: false },
+      allowedMentions: NO_PINGS,
     });
   } catch (error) {
     console.error('Error adding quote from reply:', error);
     await message.reply({
       content: 'Failed to add quote. The message may have been deleted.',
-      allowedMentions: { repliedUser: false },
+      allowedMentions: NO_PINGS,
     });
   }
 }
@@ -100,7 +105,7 @@ async function handleTranslateReply(
     if (!referencedMessage.content.trim()) {
       await message.reply({
         content: 'That message has no text content to translate.',
-        allowedMentions: { repliedUser: false },
+        allowedMentions: NO_PINGS,
       });
       return;
     }
@@ -122,14 +127,14 @@ async function handleTranslateReply(
 
     await message.reply({
       embeds: [embed],
-      allowedMentions: { repliedUser: false },
+      allowedMentions: NO_PINGS,
     });
     succeeded = true;
   } catch (error) {
     console.error('Error translating message:', error);
     await message.reply({
       content: 'Translation failed. Please try again later.',
-      allowedMentions: { repliedUser: false },
+      allowedMentions: NO_PINGS,
     });
   } finally {
     countTranslation(message.guildId, succeeded).catch((error: unknown) => {
