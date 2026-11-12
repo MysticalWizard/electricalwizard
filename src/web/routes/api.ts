@@ -7,7 +7,7 @@ import { getTranslationCounts } from '#/services/translation.js';
 import { escapeRegex } from '#/utils/regex.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 import type { Session } from '../middleware/session.js';
-import { modelRegistry } from '../utils/models.js';
+import { modelRegistry, type ModelDef } from '../utils/models.js';
 
 const api = new Hono<AuthEnv>();
 
@@ -69,6 +69,25 @@ function canWrite(session: Session, modelName: string): boolean {
   return session.role === 'admin' || session.role === 'owner';
 }
 
+/**
+ * Whether `session` sees every user's records in a private model. Only the
+ * owner does: reminders and D-Days can hold text their user asked to get by
+ * DM, so admins see only their own, like members.
+ */
+function seesAllPrivate(session: Session): boolean {
+  return session.role === 'owner';
+}
+
+/** The query filter limiting `def` to the records `session` may see. */
+function privacyFilter(
+  def: ModelDef,
+  session: Session,
+): Record<string, unknown> {
+  return def.hasPrivacy && def.ownerField && !seesAllPrivate(session)
+    ? { [def.ownerField]: session.userId }
+    : {};
+}
+
 /** A positive integer query value, or `fallback` if it's missing or invalid. */
 function positiveInt(value: string | undefined, fallback: number): number {
   const n = parseInt(value ?? '', 10);
@@ -89,19 +108,18 @@ api.get('/models', (c) => {
 
 api.get('/stats', async (c) => {
   const session = c.get('session');
-  const isPrivileged = session.role === 'admin' || session.role === 'owner';
-  const ownerFilter = isPrivileged ? {} : { userId: session.userId };
+  const ownerFilter = seesAllPrivate(session) ? {} : { userId: session.userId };
 
   const entries = Object.entries(modelRegistry);
   const [counts, activeReminders, activeDdays] = await Promise.all([
     Promise.all(
-      entries.map(([, def]) =>
-        // Privacy filtering — members only count their own records
-        def.hasPrivacy && def.ownerField && !isPrivileged
-          ? def.model.countDocuments({ [def.ownerField]: session.userId })
+      entries.map(([, def]) => {
+        const filter = privacyFilter(def, session);
+        return Object.keys(filter).length
+          ? def.model.countDocuments(filter)
           : // Unfiltered totals come from collection metadata instead of a scan
-            def.model.estimatedDocumentCount(),
-      ),
+            def.model.estimatedDocumentCount();
+      }),
     ),
     Reminder.countDocuments({
       triggerAt: { $gt: new Date() },
@@ -134,16 +152,11 @@ const ACTIVITY_PROJECTION = {
 
 api.get('/activity', async (c) => {
   const session = c.get('session');
-  const isPrivileged = session.role === 'admin' || session.role === 'owner';
 
   const perModel = await Promise.all(
     Object.entries(modelRegistry).map(async ([name, def]) => {
-      const query: Record<string, unknown> = {};
-      if (def.hasPrivacy && def.ownerField && !isPrivileged) {
-        query[def.ownerField] = session.userId;
-      }
       const docs = await def.model
-        .find(query, ACTIVITY_PROJECTION)
+        .find(privacyFilter(def, session), ACTIVITY_PROJECTION)
         .sort({ updatedAt: -1 })
         .limit(5)
         .lean();
@@ -183,17 +196,8 @@ api.get('/analytics/:model', async (c) => {
   const dateFrom = c.req.query('dateFrom');
   const dateTo = c.req.query('dateTo');
 
-  const match: Record<string, unknown> = {};
-
-  // Privacy filtering — members only see analytics over their own records
-  if (
-    def.hasPrivacy &&
-    def.ownerField &&
-    session.role !== 'admin' &&
-    session.role !== 'owner'
-  ) {
-    match[def.ownerField] = session.userId;
-  }
+  // Privacy filtering — analytics only cover records the user may see
+  const match: Record<string, unknown> = privacyFilter(def, session);
 
   if (dateFrom || dateTo) {
     match.createdAt = {};
@@ -252,13 +256,8 @@ api.get('/:model', async (c) => {
     : 'createdAt';
   const sortOrder = c.req.query('sortOrder') === 'asc' ? 1 : -1;
 
-  const query: Record<string, unknown> = {};
-
-  // Privacy filtering — members only see their own records
-  const isPrivileged = session.role === 'admin' || session.role === 'owner';
-  if (def.hasPrivacy && def.ownerField && !isPrivileged) {
-    query[def.ownerField] = session.userId;
-  }
+  // Privacy filtering — only records the user may see
+  const query: Record<string, unknown> = privacyFilter(def, session);
 
   // The caller's own records: `mine=true` matches on the owner field, and
   // `mine=<field>` on another Discord ID field (e.g. a quote's `authorId`)
@@ -300,20 +299,14 @@ api.get('/:model/:id', async (c) => {
   const def = modelRegistry[modelName];
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
-  const doc = await def.model.findById(c.req.param('id')).lean();
+  // Another user's private record is reported as missing
+  const doc = await def.model
+    .findOne({
+      _id: c.req.param('id'),
+      ...privacyFilter(def, c.get('session')),
+    })
+    .lean();
   if (!doc) return c.json({ error: 'Not found' }, 404);
-
-  const session = c.get('session');
-  if (
-    def.hasPrivacy &&
-    def.ownerField &&
-    session.role !== 'admin' &&
-    session.role !== 'owner'
-  ) {
-    const ownerValue = (doc as Record<string, unknown>)[def.ownerField];
-    if (ownerValue !== session.userId)
-      return c.json({ error: 'Not found' }, 404);
-  }
 
   return c.json(doc);
 });
