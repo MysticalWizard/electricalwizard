@@ -7,7 +7,7 @@ import {
   type Session,
 } from '../middleware/session.js';
 import { eventBus, type DbChangeEvent } from '../utils/eventBus.js';
-import { modelRegistry } from '../utils/models.js';
+import { getModelDef } from '../utils/models.js';
 
 const HEARTBEAT_MS = 30_000;
 // Plenty for one stream per open tab, while bounding what one user can hold
@@ -27,7 +27,7 @@ function visibleTo(
 ): DbChangeEvent | null {
   const { userIds, ...visible } = event;
   if (
-    !modelRegistry[event.model]?.hasPrivacy ||
+    !getModelDef(event.model)?.hasPrivacy ||
     session.role === 'owner' ||
     userIds?.includes(session.userId)
   ) {

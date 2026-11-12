@@ -161,6 +161,14 @@ export const modelRegistry: Record<string, ModelDef> = {
   },
 };
 
+/**
+ * The registry entry for `name`, or undefined. Names come from URLs, so a
+ * plain lookup would also find `constructor`, `__proto__` and the like.
+ */
+export function getModelDef(name: string): ModelDef | undefined {
+  return Object.hasOwn(modelRegistry, name) ? modelRegistry[name] : undefined;
+}
+
 const registryKeyByModelName = new Map(
   Object.entries(modelRegistry).map(([key, def]) => [def.model.modelName, key]),
 );

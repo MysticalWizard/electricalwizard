@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
+import { HTTPException } from 'hono/http-exception';
 import chalk from 'chalk';
+import mongoose from 'mongoose';
 import { config } from '#/config.js';
 import { auth } from './routes/auth.js';
 import { api } from './routes/api.js';
@@ -27,6 +29,23 @@ app.route('/api/events', events);
 app.route('/api', api);
 
 app.get('/health', (c) => c.json({ status: 'ok' }));
+
+// Bad input that Mongoose catches (a malformed ID, a missing required field,
+// a value outside an enum) is the client's mistake, not a server error
+app.onError((err, c) => {
+  if (err instanceof HTTPException) return err.getResponse();
+  if (err instanceof mongoose.Error.ValidationError) {
+    const fields = Object.fromEntries(
+      Object.entries(err.errors).map(([path, e]) => [path, e.message]),
+    );
+    return c.json({ error: 'Invalid input', fields }, 400);
+  }
+  if (err instanceof mongoose.Error.CastError) {
+    return c.json({ error: `Invalid value for ${err.path}` }, 400);
+  }
+  console.error(`${c.req.method} ${c.req.path} failed:`, err);
+  return c.text('Internal Server Error', 500);
+});
 
 // Session cookies are encrypted with a key derived from this secret, so a
 // guessable one lets anyone holding a cookie crack it offline and forge others

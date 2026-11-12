@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { config } from '#/config.js';
 import { DDay } from '#/models/DDay.js';
 import { Reminder } from '#/models/Reminder.js';
@@ -7,7 +7,7 @@ import { getTranslationCounts } from '#/services/translation.js';
 import { escapeRegex } from '#/utils/regex.js';
 import { requireAuth, type AuthEnv } from '../middleware/auth.js';
 import type { Session } from '../middleware/session.js';
-import { modelRegistry, type ModelDef } from '../utils/models.js';
+import { getModelDef, modelRegistry, type ModelDef } from '../utils/models.js';
 
 const api = new Hono<AuthEnv>();
 
@@ -29,11 +29,24 @@ function sanitize(value: unknown): boolean {
   return true;
 }
 
+/** The JSON object in the request body, or null if it isn't one. */
+async function readBody(c: Context): Promise<Record<string, unknown> | null> {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return null;
+  }
+  return typeof body === 'object' && body !== null && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : null;
+}
+
 function filterFields(
   modelName: string,
   body: Record<string, unknown>,
 ): Record<string, unknown> {
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   if (!def) return {};
   const allowed = new Set(
     def.fields.filter((f) => !f.readOnly).map((f) => f.name),
@@ -53,7 +66,7 @@ function invalidIdField(
   modelName: string,
   data: Record<string, unknown>,
 ): string | undefined {
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   return def?.fields.find((f) => {
     if (!f.snowflake || !(f.name in data)) return false;
     const value = data[f.name];
@@ -62,7 +75,7 @@ function invalidIdField(
 }
 
 function canWrite(session: Session, modelName: string): boolean {
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   if (!def) return false;
   if (def.readOnly) return false;
   if (def.ownerOnly) return session.role === 'owner';
@@ -188,7 +201,7 @@ api.get('/analytics/translations', async (c) =>
 
 api.get('/analytics/:model', async (c) => {
   const modelName = c.req.param('model');
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
   const session = c.get('session');
@@ -241,7 +254,7 @@ api.get('/analytics/:model', async (c) => {
 
 api.get('/:model', async (c) => {
   const modelName = c.req.param('model');
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
   const session = c.get('session');
@@ -296,7 +309,7 @@ api.get('/:model', async (c) => {
 
 api.get('/:model/:id', async (c) => {
   const modelName = c.req.param('model');
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
   // Another user's private record is reported as missing
@@ -313,7 +326,7 @@ api.get('/:model/:id', async (c) => {
 
 api.post('/:model', async (c) => {
   const modelName = c.req.param('model');
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
   const session = c.get('session');
@@ -321,7 +334,8 @@ api.post('/:model', async (c) => {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  const body = await c.req.json<Record<string, unknown>>();
+  const body = await readBody(c);
+  if (!body) return c.json({ error: 'Body must be a JSON object' }, 400);
   if (!sanitize(body)) return c.json({ error: 'Invalid input' }, 400);
 
   const filtered = filterFields(modelName, body);
@@ -346,7 +360,7 @@ api.post('/:model', async (c) => {
 
 api.put('/:model/:id', async (c) => {
   const modelName = c.req.param('model');
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
   const session = c.get('session');
@@ -364,7 +378,8 @@ api.put('/:model/:id', async (c) => {
     }
   }
 
-  const body = await c.req.json<Record<string, unknown>>();
+  const body = await readBody(c);
+  if (!body) return c.json({ error: 'Body must be a JSON object' }, 400);
   if (!sanitize(body)) return c.json({ error: 'Invalid input' }, 400);
 
   const filtered = filterFields(modelName, body);
@@ -387,7 +402,7 @@ api.put('/:model/:id', async (c) => {
 
 api.delete('/:model/:id', async (c) => {
   const modelName = c.req.param('model');
-  const def = modelRegistry[modelName];
+  const def = getModelDef(modelName);
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
   const session = c.get('session');
