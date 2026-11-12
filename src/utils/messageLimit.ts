@@ -26,3 +26,26 @@ export function joinWithinLimit(
   }
   return result;
 }
+
+/**
+ * Group `lines` into messages of at most `max` characters each, one line per
+ * row. A line too long for a message on its own is clipped.
+ */
+export function chunkLines(
+  lines: string[],
+  max = MESSAGE_MAX_LENGTH,
+): string[] {
+  const chunks: string[] = [];
+  let current = '';
+  for (const raw of lines) {
+    const line = clip(raw, max);
+    if (current && current.length + 1 + line.length > max) {
+      chunks.push(current);
+      current = line;
+    } else {
+      current = current ? `${current}\n${line}` : line;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}

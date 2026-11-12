@@ -9,6 +9,7 @@ import type { SlashCommand } from '#/types.js';
 import { colors, createEmbed } from '#/utils/embeds.js';
 import { getSupportedTimezones, validateTimezone } from '#/utils/timezone.js';
 import { formatFullName } from '#/utils/formatName.js';
+import { chunkLines } from '#/utils/messageLimit.js';
 import { requireAdmin, requireGuild } from '#/utils/guards.js';
 import { respondTimezoneAutocomplete } from '#/utils/autocomplete.js';
 import { User } from '#/models/User.js';
@@ -224,10 +225,14 @@ async function handleList(
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const members = await interaction.guild!.members.fetch();
-  const memberIds = new Set(members.map((m) => m.id));
 
-  const users = await User.find().sort({ createdAt: 1 }).lean();
-  const guildUsers = users.filter((u) => memberIds.has(u.discordId));
+  // Only this server's members, and only the fields shown
+  const guildUsers = await User.find(
+    { discordId: { $in: [...members.keys()] } },
+    { discordId: 1, name: 1, isBot: 1 },
+  )
+    .sort({ createdAt: 1 })
+    .lean();
 
   if (guildUsers.length === 0) {
     await interaction.editReply('No users in the database for this server.');
@@ -240,7 +245,10 @@ async function handleList(
     return `<@${user.discordId}>${botTag}${name ? ` — ${name}` : ''}`;
   });
 
-  const content = lines.join('\n');
-
-  await interaction.editReply(content);
+  // One message holds about 50 users, so longer lists continue in follow-ups
+  const [first = '', ...rest] = chunkLines(lines);
+  await interaction.editReply(first);
+  for (const content of rest) {
+    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+  }
 }
