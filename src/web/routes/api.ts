@@ -101,6 +101,27 @@ function privacyFilter(
     : {};
 }
 
+/** Fields of `def` that `session` sees only on their own records. */
+function hiddenFields(def: ModelDef, session: Session): string[] {
+  if (session.role !== 'member') return [];
+  return def.fields.filter((f) => f.memberHidden).map((f) => f.name);
+}
+
+/** `doc` without the fields `session` may not see on it. */
+function withoutHidden<T>(def: ModelDef, session: Session, doc: T): T {
+  const hidden = hiddenFields(def, session);
+  const record = doc as Record<string, unknown>;
+  if (
+    hidden.length === 0 ||
+    (def.ownerField && record[def.ownerField] === session.userId)
+  ) {
+    return doc;
+  }
+  const visible = { ...record };
+  for (const name of hidden) delete visible[name];
+  return visible as T;
+}
+
 /** A positive integer query value, or `fallback` if it's missing or invalid. */
 function positiveInt(value: string | undefined, fallback: number): number {
   const n = parseInt(value ?? '', 10);
@@ -168,12 +189,18 @@ api.get('/activity', async (c) => {
 
   const perModel = await Promise.all(
     Object.entries(modelRegistry).map(async ([name, def]) => {
+      const projection = def.ownerField
+        ? { ...ACTIVITY_PROJECTION, [def.ownerField]: 1 }
+        : ACTIVITY_PROJECTION;
       const docs = await def.model
-        .find(privacyFilter(def, session), ACTIVITY_PROJECTION)
+        .find(privacyFilter(def, session), projection)
         .sort({ updatedAt: -1 })
         .limit(5)
         .lean();
-      return docs.map((doc) => ({ model: name, doc }));
+      return docs.map((doc) => ({
+        model: name,
+        doc: withoutHidden(def, session, doc),
+      }));
     }),
   );
   const items = perModel.flat();
@@ -262,7 +289,11 @@ api.get('/:model', async (c) => {
   // MongoDB treats a limit of 0 as no limit, so it must stay at least 1
   const limit = Math.min(positiveInt(c.req.query('limit'), 25), 100);
   const search = c.req.query('search') ?? '';
-  const validFields = new Set(def.fields.map((f) => f.name));
+  // Sorting by a hidden field would reveal its order
+  const hidden = hiddenFields(def, session);
+  const validFields = new Set(
+    def.fields.map((f) => f.name).filter((name) => !hidden.includes(name)),
+  );
   const requestedSort = c.req.query('sortField') ?? 'createdAt';
   const sortField = validFields.has(requestedSort)
     ? requestedSort
@@ -304,7 +335,13 @@ api.get('/:model', async (c) => {
     def.model.countDocuments(query),
   ]);
 
-  return c.json({ docs, total, page, limit, pages: Math.ceil(total / limit) });
+  return c.json({
+    docs: docs.map((doc) => withoutHidden(def, session, doc)),
+    total,
+    page,
+    limit,
+    pages: Math.ceil(total / limit),
+  });
 });
 
 api.get('/:model/:id', async (c) => {
@@ -313,15 +350,13 @@ api.get('/:model/:id', async (c) => {
   if (!def) return c.json({ error: 'Model not found' }, 404);
 
   // Another user's private record is reported as missing
+  const session = c.get('session');
   const doc = await def.model
-    .findOne({
-      _id: c.req.param('id'),
-      ...privacyFilter(def, c.get('session')),
-    })
+    .findOne({ _id: c.req.param('id'), ...privacyFilter(def, session) })
     .lean();
   if (!doc) return c.json({ error: 'Not found' }, 404);
 
-  return c.json(doc);
+  return c.json(withoutHidden(def, session, doc));
 });
 
 api.post('/:model', async (c) => {

@@ -15,6 +15,11 @@ export interface FieldDef {
   readOnly?: boolean;
   /** Holds a Discord ID; writes must be a snowflake. */
   snowflake?: boolean;
+  /**
+   * Shown to members only on their own record (the one whose owner field
+   * holds their ID); admins and the owner always see it.
+   */
+  memberHidden?: boolean;
 }
 
 export interface ModelDef {
@@ -38,7 +43,8 @@ export const modelRegistry: Record<string, ModelDef> = {
       { name: '_id', type: 'string', readOnly: true },
       { name: 'discordId', type: 'string', required: true, readOnly: true },
       { name: 'username', type: 'string', required: true },
-      { name: 'name', type: 'object' },
+      // Real names: in Discord only admins can look them up (/user)
+      { name: 'name', type: 'object', memberHidden: true },
       { name: 'birthday', type: 'date' },
       { name: 'timezone', type: 'string' },
       { name: 'nicknameAnnounce', type: 'boolean' },
