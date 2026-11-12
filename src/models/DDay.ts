@@ -95,6 +95,8 @@ ddaySchema.index({ userId: 1, guildId: 1 });
 // poll doesn't scan the ever-growing set of completed D-Days
 ddaySchema.index({ completed: 1, targetDate: 1 });
 
+// Dashboard tables sort by creation date by default, and analytics group by it
+ddaySchema.index({ createdAt: -1 });
 // The dashboard's activity feed lists the most recently changed records
 ddaySchema.index({ updatedAt: -1 });
 

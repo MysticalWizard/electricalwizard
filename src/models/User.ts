@@ -54,6 +54,8 @@ const userSchema = new Schema<IUser>(
   },
 );
 
+// Dashboard tables sort by creation date by default, and analytics group by it
+userSchema.index({ createdAt: -1 });
 // The dashboard's activity feed lists the most recently changed records
 userSchema.index({ updatedAt: -1 });
 

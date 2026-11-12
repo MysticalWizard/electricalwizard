@@ -122,6 +122,8 @@ function withoutHidden<T>(def: ModelDef, session: Session, doc: T): T {
   return visible as T;
 }
 
+const MAX_SEARCH_LENGTH = 100;
+
 /** A positive integer query value, or `fallback` if it's missing or invalid. */
 function positiveInt(value: string | undefined, fallback: number): number {
   const n = parseInt(value ?? '', 10);
@@ -288,7 +290,8 @@ api.get('/:model', async (c) => {
   const page = positiveInt(c.req.query('page'), 1);
   // MongoDB treats a limit of 0 as no limit, so it must stay at least 1
   const limit = Math.min(positiveInt(c.req.query('limit'), 25), 100);
-  const search = c.req.query('search') ?? '';
+  // Each term is an unanchored regex over every string field
+  const search = (c.req.query('search') ?? '').slice(0, MAX_SEARCH_LENGTH);
   // Sorting by a hidden field would reveal its order
   const hidden = hiddenFields(def, session);
   const validFields = new Set(
@@ -302,6 +305,12 @@ api.get('/:model', async (c) => {
 
   // Privacy filtering — only records the user may see
   const query: Record<string, unknown> = privacyFilter(def, session);
+
+  // The dashboard manages one guild. Naming it also lets the compound
+  // indexes that start with guildId serve the `mine` filters below.
+  if (def.fields.some((f) => f.name === 'guildId')) {
+    query.guildId = config.guildId;
+  }
 
   // The caller's own records: `mine=true` matches on the owner field, and
   // `mine=<field>` on another Discord ID field (e.g. a quote's `authorId`)

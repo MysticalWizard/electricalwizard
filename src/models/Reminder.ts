@@ -63,6 +63,8 @@ const reminderSchema = new Schema<IReminder>(
 reminderSchema.index({ triggerAt: 1 });
 reminderSchema.index({ userId: 1, guildId: 1 });
 
+// Dashboard tables sort by creation date by default, and analytics group by it
+reminderSchema.index({ createdAt: -1 });
 // The dashboard's activity feed lists the most recently changed records
 reminderSchema.index({ updatedAt: -1 });
 

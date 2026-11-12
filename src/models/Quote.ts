@@ -108,7 +108,11 @@ quoteSchema.index({ guildId: 1, quoteNumber: 1 }, { unique: true });
 quoteSchema.index({ guildId: 1, contentKey: 1 });
 quoteSchema.index({ guildId: 1, authorId: 1 });
 quoteSchema.index({ guildId: 1, year: 1 });
+// The dashboard profile's "quotes I added"
+quoteSchema.index({ guildId: 1, addedById: 1 });
 
+// Dashboard tables sort by creation date by default, and analytics group by it
+quoteSchema.index({ createdAt: -1 });
 // The dashboard's activity feed lists the most recently changed records
 quoteSchema.index({ updatedAt: -1 });
 
