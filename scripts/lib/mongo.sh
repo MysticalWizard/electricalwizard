@@ -5,6 +5,10 @@
 #   host, db   MONGODB_HOST and MONGODB_DB, with the same defaults as src/config.ts
 #   auth_args  credential flags for mongodump/mongoexport (empty without auth)
 
+# Dumps hold names, birthdays and private reminder text: keep everything the
+# scripts create readable by this user only.
+umask 077
+
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 if [[ -f "$root/.env" ]]; then
