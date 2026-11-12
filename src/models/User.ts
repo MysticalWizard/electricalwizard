@@ -54,6 +54,9 @@ const userSchema = new Schema<IUser>(
   },
 );
 
+// The dashboard's activity feed lists the most recently changed records
+userSchema.index({ updatedAt: -1 });
+
 userSchema.plugin(changeFeedPlugin);
 
 export const User = model<IUser>('User', userSchema);

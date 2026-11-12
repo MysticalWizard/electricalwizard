@@ -62,6 +62,9 @@ const reminderSchema = new Schema<IReminder>(
 reminderSchema.index({ triggerAt: 1 });
 reminderSchema.index({ userId: 1, guildId: 1 });
 
+// The dashboard's activity feed lists the most recently changed records
+reminderSchema.index({ updatedAt: -1 });
+
 // Private records: only their owner is told about changes
 reminderSchema.plugin(changeFeedPlugin, { ownerField: 'userId' });
 

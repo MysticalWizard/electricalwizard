@@ -3,8 +3,10 @@ import {
   useMutation,
   useQueryClient,
   keepPreviousData,
+  type QueryClient,
 } from '@tanstack/react-query';
 import { api } from './client';
+import { isLive } from './sse';
 import type {
   ModelDef,
   PaginatedResponse,
@@ -14,6 +16,19 @@ import type {
   BotUptime,
   TranslationCountPoint,
 } from '@electricalwizard/shared';
+
+/**
+ * Refetch what a write changed. Skipped while the event stream is connected:
+ * the write comes back as an event, and useSSE refetches then, so doing it
+ * here too would fetch everything twice.
+ */
+function refreshAfterWrite(qc: QueryClient, model: string): void {
+  if (isLive()) return;
+  qc.invalidateQueries({ queryKey: ['documents', model] });
+  qc.invalidateQueries({ queryKey: ['analytics', model] });
+  qc.invalidateQueries({ queryKey: ['stats'] });
+  qc.invalidateQueries({ queryKey: ['activity'] });
+}
 
 export function useModels() {
   return useQuery({
@@ -57,11 +72,7 @@ export function useCreateDocument(model: string) {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['documents', model] });
-      qc.invalidateQueries({ queryKey: ['stats'] });
-      qc.invalidateQueries({ queryKey: ['activity'] });
-    },
+    onSuccess: () => refreshAfterWrite(qc, model),
   });
 }
 
@@ -73,10 +84,7 @@ export function useUpdateDocument(model: string) {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['documents', model] });
-      qc.invalidateQueries({ queryKey: ['activity'] });
-    },
+    onSuccess: () => refreshAfterWrite(qc, model),
   });
 }
 
@@ -85,11 +93,7 @@ export function useDeleteDocument(model: string) {
   return useMutation({
     mutationFn: (id: string) =>
       api(`/api/${model}/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['documents', model] });
-      qc.invalidateQueries({ queryKey: ['stats'] });
-      qc.invalidateQueries({ queryKey: ['activity'] });
-    },
+    onSuccess: () => refreshAfterWrite(qc, model),
   });
 }
 

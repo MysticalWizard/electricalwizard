@@ -35,6 +35,9 @@ nicknameSchema.index({ guildId: 1, nickname: 1 }, { unique: true });
 // Index for efficient lookup by user within a guild
 nicknameSchema.index({ guildId: 1, userId: 1 });
 
+// The dashboard's activity feed lists the most recently changed records
+nicknameSchema.index({ updatedAt: -1 });
+
 nicknameSchema.plugin(changeFeedPlugin);
 
 export const Nickname = model<INickname>('Nickname', nicknameSchema);

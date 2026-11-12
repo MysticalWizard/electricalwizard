@@ -105,6 +105,9 @@ quoteSchema.index({ guildId: 1, contentKey: 1 });
 quoteSchema.index({ guildId: 1, authorId: 1 });
 quoteSchema.index({ guildId: 1, year: 1 });
 
+// The dashboard's activity feed lists the most recently changed records
+quoteSchema.index({ updatedAt: -1 });
+
 quoteSchema.plugin(changeFeedPlugin);
 
 export const Quote = model<IQuote>('Quote', quoteSchema);

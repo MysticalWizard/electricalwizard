@@ -94,6 +94,9 @@ ddaySchema.index({ userId: 1, guildId: 1 });
 // poll doesn't scan the ever-growing set of completed D-Days
 ddaySchema.index({ completed: 1, targetDate: 1 });
 
+// The dashboard's activity feed lists the most recently changed records
+ddaySchema.index({ updatedAt: -1 });
+
 // Private records: only their owner is told about changes
 ddaySchema.plugin(changeFeedPlugin, { ownerField: 'userId' });
 

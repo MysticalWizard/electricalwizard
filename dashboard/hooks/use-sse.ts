@@ -9,6 +9,10 @@ import { useAuth } from './use-auth';
 // records), so they're collected and invalidated together once per window.
 const BATCH_MS = 300;
 
+// Changes that don't alter record counts or the activity feed: daily
+// translation counters and the bot's own status
+const NOT_RECORDS = new Set(['translations', 'bots']);
+
 export function useSSE() {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -24,13 +28,17 @@ export function useSSE() {
       if (changedModels.has('bots')) {
         qc.invalidateQueries({ queryKey: ['uptime'] });
       }
+      let recordsChanged = false;
       for (const model of changedModels) {
         qc.invalidateQueries({ queryKey: ['documents', model] });
         qc.invalidateQueries({ queryKey: ['analytics', model] });
+        if (!NOT_RECORDS.has(model)) recordsChanged = true;
       }
       changedModels.clear();
-      qc.invalidateQueries({ queryKey: ['stats'] });
-      qc.invalidateQueries({ queryKey: ['activity'] });
+      if (recordsChanged) {
+        qc.invalidateQueries({ queryKey: ['stats'] });
+        qc.invalidateQueries({ queryKey: ['activity'] });
+      }
     };
 
     const close = createSSEConnection((event) => {
