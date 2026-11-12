@@ -34,6 +34,7 @@ const reminderSchema = new Schema<IReminder>(
     message: {
       type: String,
       required: true,
+      maxlength: 1000,
     },
     triggerAt: {
       type: Date,

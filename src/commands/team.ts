@@ -19,7 +19,9 @@ export const command: SlashCommand = {
       option
         .setName('players')
         .setDescription('Comma-separated list of players')
-        .setRequired(true),
+        .setRequired(true)
+        // Leaves room for the team headings within one message
+        .setMaxLength(1500),
     )
     .addIntegerOption((option) =>
       option

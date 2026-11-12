@@ -41,7 +41,8 @@ export const command: SlashCommand = {
           option
             .setName('message')
             .setDescription('What to remind you about')
-            .setRequired(true),
+            .setRequired(true)
+            .setMaxLength(1000),
         )
         .addStringOption((option) =>
           option

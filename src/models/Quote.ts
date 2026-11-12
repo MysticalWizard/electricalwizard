@@ -38,9 +38,11 @@ const quoteSchema = new Schema<IQuote>(
     quoteNumber: {
       type: Number,
     },
+    // Quotes made by replying to a message can be as long as the message
     content: {
       type: String,
       required: true,
+      maxlength: 4000,
     },
     // Derived from content by the hooks below; not edited directly
     contentKey: {
@@ -51,6 +53,7 @@ const quoteSchema = new Schema<IQuote>(
     },
     authorName: {
       type: String,
+      maxlength: 100,
     },
     year: {
       type: Number,
@@ -58,6 +61,7 @@ const quoteSchema = new Schema<IQuote>(
     },
     context: {
       type: String,
+      maxlength: 2000,
     },
     addedById: {
       type: String,

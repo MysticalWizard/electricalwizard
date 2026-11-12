@@ -31,6 +31,11 @@ import {
 } from '#/utils/formatName.js';
 import { colors, createEmbed } from '#/utils/embeds.js';
 import { requireGuild, isAdmin } from '#/utils/guards.js';
+import {
+  clip,
+  joinWithinLimit,
+  MESSAGE_MAX_LENGTH,
+} from '#/utils/messageLimit.js';
 
 async function formatQuotesForDisplay(quotes: IQuote[]): Promise<string[]> {
   // Quotes stored with only an author ID take the name from the User model,
@@ -119,7 +124,12 @@ async function handleAdd(
 
   const displayText = formatQuoteDisplay(content, authorName!, year, context);
 
-  await interaction.reply(`Quote #${quote.quoteNumber} added: ${displayText}`);
+  await interaction.reply(
+    clip(
+      `Quote #${quote.quoteNumber} added: ${displayText}`,
+      MESSAGE_MAX_LENGTH,
+    ),
+  );
 }
 
 async function handleGet(
@@ -163,7 +173,7 @@ async function handleGet(
 
   const quoteLines = await formatQuotesForDisplay(quotes);
 
-  await interaction.reply(quoteLines.join('\n\n'));
+  await interaction.reply(joinWithinLimit(quoteLines, '\n\n'));
 }
 
 async function handleRandom(
@@ -184,7 +194,7 @@ async function handleRandom(
 
   const quoteLines = await formatQuotesForDisplay(quotes);
 
-  await interaction.reply(quoteLines.join('\n\n'));
+  await interaction.reply(joinWithinLimit(quoteLines, '\n\n'));
 }
 
 async function handleDelete(
@@ -217,7 +227,7 @@ async function handleDelete(
   const embed = createEmbed()
     .setTitle('Delete Quote?')
     .setColor(colors.warning)
-    .setDescription(`**#${quote.quoteNumber}** ${formatted}`)
+    .setDescription(clip(`**#${quote.quoteNumber}** ${formatted}`, 4096))
     .setFooter({ text: 'This action cannot be undone.' });
 
   const cancelButton = new ButtonBuilder()
@@ -301,7 +311,8 @@ export const command: SlashCommand = {
           option
             .setName('content')
             .setDescription('The quote text')
-            .setRequired(true),
+            .setRequired(true)
+            .setMaxLength(1500),
         )
         .addStringOption((option) =>
           option
@@ -310,7 +321,8 @@ export const command: SlashCommand = {
               'Who said the quote (select user or type custom name)',
             )
             .setRequired(true)
-            .setAutocomplete(true),
+            .setAutocomplete(true)
+            .setMaxLength(100),
         )
         .addIntegerOption((option) =>
           option
@@ -323,7 +335,8 @@ export const command: SlashCommand = {
         .addStringOption((option) =>
           option
             .setName('context')
-            .setDescription('Additional context for the quote'),
+            .setDescription('Additional context for the quote')
+            .setMaxLength(200),
         ),
     )
     .addSubcommand((subcommand) =>

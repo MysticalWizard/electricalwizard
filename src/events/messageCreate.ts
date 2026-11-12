@@ -14,6 +14,11 @@ import {
 } from '#/utils/formatName.js';
 import { createEmbed } from '#/utils/embeds.js';
 import { Cooldown } from '#/utils/cooldown.js';
+import {
+  clip,
+  EMBED_DESCRIPTION_MAX_LENGTH,
+  MESSAGE_MAX_LENGTH,
+} from '#/utils/messageLimit.js';
 
 const QUOTE_REGEX = /^quote(?:\s+(.+))?$/i;
 const TRANSLATE_REGEX = /^(?:translate|tr|tl)(?:\s+(.+))?$/i;
@@ -108,11 +113,14 @@ async function handleQuoteReply(
       context,
     );
 
-    let response = `Quote #${quote.quoteNumber} added: ${displayText}`;
-
-    if (!hasName) {
-      response += `\n\n*Note: ${referencedMessage.author} doesn't have a name set. An admin can set it with \`/user set\`.*`;
-    }
+    const note = hasName
+      ? ''
+      : `\n\n*Note: ${referencedMessage.author} doesn't have a name set. An admin can set it with \`/user set\`.*`;
+    const response =
+      clip(
+        `Quote #${quote.quoteNumber} added: ${displayText}`,
+        MESSAGE_MAX_LENGTH - note.length,
+      ) + note;
 
     await message.reply({
       content: response,
@@ -171,7 +179,7 @@ async function handleTranslateReply(
 
     const embed = createEmbed()
       .setTitle(`${flag} Translation to ${result.targetLangName}`)
-      .setDescription(result.translatedText)
+      .setDescription(clip(result.translatedText, EMBED_DESCRIPTION_MAX_LENGTH))
       .setFooter({
         text: `Detected source: ${result.detectedSourceLangName}`,
       });

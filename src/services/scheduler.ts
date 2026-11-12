@@ -15,6 +15,11 @@ import {
   formatDDayDisplay,
 } from '#/services/dday.js';
 import { colors, createEmbed } from '#/utils/embeds.js';
+import {
+  clip,
+  EMBED_DESCRIPTION_MAX_LENGTH,
+  EMBED_TITLE_MAX_LENGTH,
+} from '#/utils/messageLimit.js';
 
 const CHECK_INTERVAL = 30_000; // 30 seconds
 // A failed delivery is retried this often, and given up after this many tries
@@ -159,7 +164,7 @@ async function checkAndSendReminders(client: Client): Promise<void> {
         const embed = createEmbed()
           .setTitle('Reminder')
           .setColor(colors.primary)
-          .setDescription(reminder.message)
+          .setDescription(clip(reminder.message, EMBED_DESCRIPTION_MAX_LENGTH))
           .setTimestamp(reminder.createdAt)
           .setFooter({ text: 'Reminder set' });
 
@@ -214,7 +219,9 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
         }
 
         const embed = createEmbed()
-          .setTitle(`${displayStr} - ${dday.title}`)
+          .setTitle(
+            clip(`${displayStr} - ${dday.title}`, EMBED_TITLE_MAX_LENGTH),
+          )
           .setColor(days === 0 ? colors.success : colors.primary)
           .setDescription(description)
           .addFields(
@@ -240,7 +247,7 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
           .setTitle('D-Day Complete!')
           .setColor(colors.warning)
           .setDescription(
-            `**${dday.title}** has passed.\n\nWould you like to delete this countdown?\nUse \`/dday delete\` to remove it.`,
+            `**${clip(dday.title, EMBED_TITLE_MAX_LENGTH)}** has passed.\n\nWould you like to delete this countdown?\nUse \`/dday delete\` to remove it.`,
           );
 
         await deliver(client, dday, embed);

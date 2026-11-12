@@ -55,7 +55,8 @@ export const command: SlashCommand = {
           option
             .setName('title')
             .setDescription('Title of the D-Day')
-            .setRequired(true),
+            .setRequired(true)
+            .setMaxLength(200),
         )
         .addStringOption((option) =>
           option

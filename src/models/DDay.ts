@@ -42,6 +42,7 @@ const ddaySchema = new Schema<IDDay>(
     title: {
       type: String,
       required: true,
+      maxlength: 200,
     },
     targetDate: {
       type: Date,
