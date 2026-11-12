@@ -30,6 +30,19 @@ function visibleTo(session: Session, event: DbChangeEvent): DbChangeEvent {
 
 const events = new Hono<AuthEnv>();
 
+// Compressing proxies (including the dashboard's own Next server) hold small
+// writes until their buffer fills, so events would never arrive. `no-transform`
+// opts the stream out of compression; `X-Accel-Buffering` turns off nginx's
+// response buffering. Set after the handler, since streamSSE sets its own
+// Cache-Control.
+events.use('*', async (c, next) => {
+  await next();
+  if (c.res.headers.get('Content-Type')?.startsWith('text/event-stream')) {
+    c.res.headers.set('Cache-Control', 'no-cache, no-transform');
+    c.res.headers.set('X-Accel-Buffering', 'no');
+  }
+});
+
 events.get('/', requireAuth, (c) => {
   let session = c.get('session');
   const { userId } = session;
@@ -41,6 +54,11 @@ events.get('/', requireAuth, (c) => {
   openStreams.set(userId, open + 1);
 
   return streamSSE(c, async (stream) => {
+    // Proxies (the dashboard's Next server among them) pass the headers on
+    // only with the first chunk, and the browser counts the stream as open
+    // only once it has them, so send one straight away
+    await stream.writeSSE({ event: 'ready', data: '' });
+
     const onDbChange = (data: DbChangeEvent) => {
       stream
         .writeSSE({
