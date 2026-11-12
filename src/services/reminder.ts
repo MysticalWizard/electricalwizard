@@ -65,20 +65,43 @@ export async function cancelReminder(
 }
 
 /**
- * Get all due reminders (triggerAt <= now) and delete them. The find and
- * delete are separate queries, so this assumes a single scheduler instance.
+ * Reminders that are due, skipping any waiting to retry a failed delivery.
+ * They stay in the database until sent (see markReminderSent), so a failed
+ * send or a crash mid-tick doesn't lose them. This assumes a single scheduler
+ * instance.
  */
 export async function getDueReminders(): Promise<IReminder[]> {
   const now = new Date();
-  const reminders = await Reminder.find({ triggerAt: { $lte: now } }).lean();
+  return Reminder.find({
+    triggerAt: { $lte: now },
+    retryAt: { $not: { $gt: now } },
+  }).lean();
+}
 
-  if (reminders.length > 0) {
-    await Reminder.deleteMany({
-      _id: { $in: reminders.map((r) => r._id) },
-    });
+/** Remove a reminder once it has been delivered. */
+export async function markReminderSent(reminder: IReminder): Promise<void> {
+  await Reminder.deleteOne({ _id: reminder._id });
+}
+
+/**
+ * Record a failed delivery: try again at `retryAt`, or drop the reminder once
+ * it has failed `maxAttempts` times. Returns true if it was dropped.
+ */
+export async function markReminderFailed(
+  reminder: IReminder,
+  maxAttempts: number,
+  retryAt: Date,
+): Promise<boolean> {
+  const attempts = (reminder.deliveryAttempts ?? 0) + 1;
+  if (attempts >= maxAttempts) {
+    await Reminder.deleteOne({ _id: reminder._id });
+    return true;
   }
-
-  return reminders;
+  await Reminder.updateOne(
+    { _id: reminder._id },
+    { $set: { deliveryAttempts: attempts, retryAt } },
+  );
+  return false;
 }
 
 /**

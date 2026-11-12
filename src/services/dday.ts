@@ -145,48 +145,83 @@ export async function getDDaysForAutocomplete(
   }));
 }
 
-/**
- * Get due D-Day notifications and update nextNotifyAt
- */
-export async function getDueDDayNotifications(): Promise<IDDay[]> {
-  const now = new Date();
-
-  // Find D-Days that are due for notification and not completed
-  const ddays = await DDay.find({
-    nextNotifyAt: { $lte: now },
-    completed: false,
-  }).lean();
-
-  // Update nextNotifyAt for each D-Day
-  for (const dday of ddays) {
-    let nextNotifyAt: Date | null;
-
-    if (dday.nextNotifyAt && dday.nextNotifyAt < dday.targetDate) {
-      // After the immediate notification, next alert fires at the target date
-      nextNotifyAt = dday.targetDate;
-    } else {
-      // After target date, continue on schedule anchored to previous notification
-      const base = dday.nextNotifyAt ?? now;
-      nextNotifyAt = calculateNextNotifyAt(base, dday.reminderFrequency);
-    }
-
-    await DDay.updateOne({ _id: dday._id }, { $set: { nextNotifyAt } });
-  }
-
-  return ddays;
+/** Not waiting to retry a failed notification. */
+function notRetrying(now: Date) {
+  return { retryAt: { $not: { $gt: now } } };
 }
 
 /**
- * Process D-Days whose target date has passed. Recurring ones roll forward a
- * year; others are marked completed and returned if not yet notified.
+ * D-Days due for a notification. Nothing is changed until the notification
+ * has been sent (see markDDayNotified), so a failed send or a crash mid-tick
+ * doesn't skip it.
+ */
+export async function getDueDDayNotifications(): Promise<IDDay[]> {
+  const now = new Date();
+  return DDay.find({
+    nextNotifyAt: { $lte: now },
+    completed: false,
+    ...notRetrying(now),
+  }).lean();
+}
+
+/** When the notification after the one due for `dday` should go out. */
+function followingNotifyAt(dday: IDDay): Date | null {
+  if (dday.nextNotifyAt && dday.nextNotifyAt < dday.targetDate) {
+    // After the immediate notification, next alert fires at the target date
+    return dday.targetDate;
+  }
+  // After target date, continue on schedule anchored to previous notification
+  return calculateNextNotifyAt(
+    dday.nextNotifyAt ?? new Date(),
+    dday.reminderFrequency,
+  );
+}
+
+/** Schedule the next notification once the due one has been sent. */
+export async function markDDayNotified(dday: IDDay): Promise<void> {
+  await DDay.updateOne(
+    { _id: dday._id },
+    {
+      $set: { nextNotifyAt: followingNotifyAt(dday), deliveryAttempts: 0 },
+      $unset: { retryAt: 1 },
+    },
+  );
+}
+
+/**
+ * Record a failed notification: try again at `retryAt`, or skip it once it
+ * has failed `maxAttempts` times. Returns true if it was skipped.
+ */
+export async function markDDayNotifyFailed(
+  dday: IDDay,
+  maxAttempts: number,
+  retryAt: Date,
+): Promise<boolean> {
+  const attempts = (dday.deliveryAttempts ?? 0) + 1;
+  if (attempts >= maxAttempts) {
+    await markDDayNotified(dday);
+    return true;
+  }
+  await DDay.updateOne(
+    { _id: dday._id },
+    { $set: { deliveryAttempts: attempts, retryAt } },
+  );
+  return false;
+}
+
+/**
+ * Handle D-Days whose target date has passed. Recurring ones roll forward a
+ * year, and ones already notified are marked completed. Returns the rest,
+ * which need a completion notice before they are marked completed (see
+ * markDDayCompleted).
  */
 export async function processCompletedDDays(): Promise<IDDay[]> {
   const now = new Date();
 
-  // Find D-Days that have passed and need completion handling
   const passedDDays = await DDay.find({
     targetDate: { $lte: now },
     completed: false,
+    ...notRetrying(now),
   }).lean();
 
   const toNotify: IDDay[] = [];
@@ -201,25 +236,55 @@ export async function processCompletedDDays(): Promise<IDDay[]> {
         { _id: dday._id },
         { $set: { targetDate: newTargetDate } },
       );
+    } else if (dday.completionNotified) {
+      await markDDayCompleted(dday);
     } else {
-      // For non-recurring D-Days, mark as completed and notified
-      await DDay.updateOne(
-        { _id: dday._id },
-        {
-          $set: {
-            completed: true,
-            nextNotifyAt: null,
-            completionNotified: true,
-          },
-        },
-      );
-
-      // Add to notification list if not already notified
-      if (!dday.completionNotified) toNotify.push(dday);
+      toNotify.push(dday);
     }
   }
 
   return toNotify;
+}
+
+/** Mark a passed D-Day completed, after its completion notice was sent. */
+export async function markDDayCompleted(
+  dday: IDDay,
+  notified = true,
+): Promise<void> {
+  await DDay.updateOne(
+    { _id: dday._id },
+    {
+      $set: {
+        completed: true,
+        nextNotifyAt: null,
+        completionNotified: notified || dday.completionNotified,
+        deliveryAttempts: 0,
+      },
+      $unset: { retryAt: 1 },
+    },
+  );
+}
+
+/**
+ * Record a failed completion notice: try again at `retryAt`, or mark the
+ * D-Day completed without one once it has failed `maxAttempts` times.
+ * Returns true if it gave up.
+ */
+export async function markDDayCompletionFailed(
+  dday: IDDay,
+  maxAttempts: number,
+  retryAt: Date,
+): Promise<boolean> {
+  const attempts = (dday.deliveryAttempts ?? 0) + 1;
+  if (attempts >= maxAttempts) {
+    await markDDayCompleted(dday, false);
+    return true;
+  }
+  await DDay.updateOne(
+    { _id: dday._id },
+    { $set: { deliveryAttempts: attempts, retryAt } },
+  );
+  return false;
 }
 
 /**

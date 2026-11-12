@@ -17,6 +17,10 @@ export interface IDDay extends Document {
   nextNotifyAt: Date | null;
   completed: boolean;
   completionNotified: boolean;
+  /** Failed deliveries of the pending notification so far. */
+  deliveryAttempts: number;
+  /** When to try a failed notification again. */
+  retryAt?: Date | undefined;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +74,13 @@ const ddaySchema = new Schema<IDDay>(
     completionNotified: {
       type: Boolean,
       default: false,
+    },
+    deliveryAttempts: {
+      type: Number,
+      default: 0,
+    },
+    retryAt: {
+      type: Date,
     },
   },
   {

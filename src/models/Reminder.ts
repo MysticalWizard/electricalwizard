@@ -9,6 +9,10 @@ export interface IReminder extends Document {
   triggerAt: Date;
   timezone?: string;
   private: boolean;
+  /** Failed deliveries so far; the reminder is dropped after a few. */
+  deliveryAttempts: number;
+  /** When to try a failed delivery again. */
+  retryAt?: Date | undefined;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,6 +45,13 @@ const reminderSchema = new Schema<IReminder>(
     private: {
       type: Boolean,
       default: false,
+    },
+    deliveryAttempts: {
+      type: Number,
+      default: 0,
+    },
+    retryAt: {
+      type: Date,
     },
   },
   {

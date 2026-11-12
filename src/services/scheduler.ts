@@ -1,7 +1,15 @@
 import type { Client, EmbedBuilder } from 'discord.js';
-import { getDueReminders } from '#/services/reminder.js';
+import {
+  getDueReminders,
+  markReminderFailed,
+  markReminderSent,
+} from '#/services/reminder.js';
 import {
   getDueDDayNotifications,
+  markDDayCompleted,
+  markDDayCompletionFailed,
+  markDDayNotified,
+  markDDayNotifyFailed,
   processCompletedDDays,
   calculateDaysUntil,
   formatDDayDisplay,
@@ -9,8 +17,13 @@ import {
 import { colors, createEmbed } from '#/utils/embeds.js';
 
 const CHECK_INTERVAL = 30_000; // 30 seconds
+// A failed delivery is retried this often, and given up after this many tries
+const RETRY_DELAY_MS = 5 * 60_000;
+const MAX_DELIVERY_ATTEMPTS = 3;
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
+// A tick can outlast the interval when Discord is slow
+let running = false;
 
 /** The fields that decide where a reminder or D-Day notification goes. */
 interface Recipient {
@@ -18,27 +31,28 @@ interface Recipient {
   channelId: string;
   userId: string;
   private: boolean;
+  deliveryAttempts?: number | undefined;
 }
 
-/**
- * Send an embed to the owner of a reminder or D-Day: as a DM when it's
- * private, otherwise in its channel with a ping. These records can be edited
- * from the dashboard, so delivery is held to the record's guild: the channel
- * must belong to it, a DM recipient must be a member of it, and the owner is
- * the only mention allowed.
- */
-async function deliver(
+// These records can be edited from the dashboard, so delivery is held to the
+// record's guild: the channel must belong to it, a DM recipient must be a
+// member of it, and the owner is the only mention allowed.
+
+async function sendDM(
   client: Client,
   record: Recipient,
   embed: EmbedBuilder,
 ): Promise<void> {
-  if (record.private) {
-    const guild = await client.guilds.fetch(record.guildId);
-    const member = await guild.members.fetch(record.userId);
-    await member.send({ embeds: [embed] });
-    return;
-  }
+  const guild = await client.guilds.fetch(record.guildId);
+  const member = await guild.members.fetch(record.userId);
+  await member.send({ embeds: [embed] });
+}
 
+async function sendToChannel(
+  client: Client,
+  record: Recipient,
+  message: { content?: string; embeds?: EmbedBuilder[] },
+): Promise<void> {
   const channel = await client.channels.fetch(record.channelId);
   if (
     !channel?.isSendable() ||
@@ -50,10 +64,53 @@ async function deliver(
     );
   }
   await channel.send({
-    content: `<@${record.userId}>`,
-    embeds: [embed],
+    ...message,
+    content: `<@${record.userId}>${message.content ? ` ${message.content}` : ''}`,
     allowedMentions: { users: [record.userId] },
   });
+}
+
+/**
+ * Send an embed to the owner of a reminder or D-Day: as a DM when it's
+ * private, otherwise in its channel with a ping. If the channel can't be
+ * used, the owner gets it by DM instead. A private one is never posted in the
+ * channel; on its first failure the owner is asked there to open their DMs.
+ * Throws if the embed couldn't be delivered.
+ */
+async function deliver(
+  client: Client,
+  record: Recipient,
+  embed: EmbedBuilder,
+): Promise<void> {
+  if (record.private) {
+    try {
+      await sendDM(client, record, embed);
+    } catch (error) {
+      if (!record.deliveryAttempts) {
+        await sendToChannel(client, record, {
+          content:
+            "I couldn't send you a private reminder by DM. Allow direct messages from this server's members and I'll try again shortly.",
+        }).catch(() => {});
+      }
+      throw error;
+    }
+    return;
+  }
+
+  try {
+    await sendToChannel(client, record, { embeds: [embed] });
+  } catch (error) {
+    console.error(
+      `Couldn't post in channel ${record.channelId}, sending by DM instead:`,
+      error,
+    );
+    await sendDM(client, record, embed);
+  }
+}
+
+/** When a delivery that failed now should be tried again. */
+function nextRetry(): Date {
+  return new Date(Date.now() + RETRY_DELAY_MS);
 }
 
 /**
@@ -91,6 +148,8 @@ export function stopReminderScheduler(): void {
  * Check for due reminders and send them
  */
 async function checkAndSendReminders(client: Client): Promise<void> {
+  if (running) return;
+  running = true;
   try {
     // Process regular reminders
     const reminders = await getDueReminders();
@@ -107,13 +166,27 @@ async function checkAndSendReminders(client: Client): Promise<void> {
         await deliver(client, reminder, embed);
       } catch (error) {
         console.error(`Failed to send reminder ${reminder._id}:`, error);
+        const gaveUp = await markReminderFailed(
+          reminder,
+          MAX_DELIVERY_ATTEMPTS,
+          nextRetry(),
+        );
+        if (gaveUp) {
+          console.error(
+            `Gave up on reminder ${reminder._id} after ${MAX_DELIVERY_ATTEMPTS} attempts`,
+          );
+        }
+        continue;
       }
+      await markReminderSent(reminder);
     }
 
     // Process D-Day notifications
     await checkAndSendDDayNotifications(client);
   } catch (error) {
     console.error('Error checking reminders:', error);
+  } finally {
+    running = false;
   }
 }
 
@@ -152,7 +225,10 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
         await deliver(client, dday, embed);
       } catch (error) {
         console.error(`Failed to send D-Day notification ${dday._id}:`, error);
+        await markDDayNotifyFailed(dday, MAX_DELIVERY_ATTEMPTS, nextRetry());
+        continue;
       }
+      await markDDayNotified(dday);
     }
 
     // Process completed D-Days and send completion notifications
@@ -173,7 +249,14 @@ async function checkAndSendDDayNotifications(client: Client): Promise<void> {
           `Failed to send D-Day completion notification ${dday._id}:`,
           error,
         );
+        await markDDayCompletionFailed(
+          dday,
+          MAX_DELIVERY_ATTEMPTS,
+          nextRetry(),
+        );
+        continue;
       }
+      await markDDayCompleted(dday);
     }
   } catch (error) {
     console.error('Error checking D-Day notifications:', error);
