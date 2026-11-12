@@ -72,6 +72,17 @@ export function invalidateNicknameCache(modelName: string): void {
 }
 
 /**
+ * Every nickname in a guild, from the in-memory cache used for matching
+ * (kept current through the change feed). For autocomplete, which runs on
+ * every keystroke.
+ */
+export async function getCachedGuildNicknames(
+  guildId: string,
+): Promise<Array<{ nickname: string; userId: string }>> {
+  return (await loadGuildNicknames(guildId)).nicknames;
+}
+
+/**
  * Find all nickname mentions in a message, ordered by their position in the
  * text. Returns nothing when the guild has announcements off, and skips users
  * who turned them off for themselves.

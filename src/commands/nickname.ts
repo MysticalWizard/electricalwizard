@@ -20,6 +20,7 @@ import {
   setNicknameAnnounce,
   toggleUserNicknameAnnounce,
   countUserNicknames,
+  getCachedGuildNicknames,
 } from '#/services/nickname.js';
 
 // Short nicknames match inside ordinary messages (`a`, `i`), and every
@@ -128,7 +129,7 @@ export const command: SlashCommand = {
     const admin = member.permissions.has(PermissionFlagsBits.Administrator);
 
     const nicknames = admin
-      ? await getGuildNicknames(interaction.guild.id)
+      ? await getCachedGuildNicknames(interaction.guild.id)
       : await getUserNicknames(interaction.guild.id, interaction.user.id);
 
     const filtered = nicknames

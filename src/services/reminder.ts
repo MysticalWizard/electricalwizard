@@ -1,6 +1,7 @@
 import { Reminder, type IReminder } from '#/models/Reminder.js';
 import { User } from '#/models/User.js';
 import { escapeRegex } from '#/utils/regex.js';
+import { cacheFor } from '#/utils/cacheFor.js';
 
 export interface CreateReminderData {
   guildId: string;
@@ -112,18 +113,20 @@ export async function markReminderFailed(
 }
 
 /**
- * Get used timezones by users for autocomplete
+ * Timezones users have set, for autocomplete. Autocomplete runs on every
+ * keystroke, so the list is reused for a minute.
  */
-export async function getUsedTimezones(): Promise<string[]> {
-  // Get unique timezones from users who have set one
-  const users = await User.find(
-    { timezone: { $exists: true, $ne: null } },
-    { timezone: 1 },
-  ).lean();
-
-  const timezones = [...new Set(users.map((u) => u.timezone).filter(Boolean))];
-  return timezones as string[];
-}
+export const getUsedTimezones = cacheFor(
+  60_000,
+  async (): Promise<string[]> => {
+    const timezones = await User.distinct('timezone', {
+      timezone: { $exists: true, $ne: null },
+    });
+    return timezones.filter(
+      (tz): tz is string => typeof tz === 'string' && tz !== '',
+    );
+  },
+);
 
 /**
  * Get reminders for autocomplete (user's active reminders)

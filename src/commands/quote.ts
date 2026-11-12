@@ -420,26 +420,14 @@ export const command: SlashCommand = {
         if (!interaction.guild) return;
 
         const authors = await getQuoteAuthors(interaction.guild.id);
-        const users = await User.find(
-          { discordId: { $in: authors.map((a) => a.authorId) } },
-          { discordId: 1, username: 1, name: 1 },
-        ).lean();
-        const usersById = new Map(users.map((u) => [u.discordId, u]));
 
         // Filter across all authors before capping at Discord's 25 choices
         const search = focusedOption.value.toLowerCase();
         const authorChoices = authors
-          .map((author) => {
-            const user = usersById.get(author.authorId);
-            const displayName = user?.name?.first
-              ? formatNameWithInitials(user.name.first, user.name.last)
-              : (user?.username ?? 'Unknown');
-
-            return {
-              name: `${displayName} (${author.count} quote${author.count === 1 ? '' : 's'})`,
-              value: author.authorId,
-            };
-          })
+          .map((author) => ({
+            name: `${author.displayName} (${author.count} quote${author.count === 1 ? '' : 's'})`,
+            value: author.authorId,
+          }))
           .filter((choice) => choice.name.toLowerCase().includes(search))
           .slice(0, 25);
 

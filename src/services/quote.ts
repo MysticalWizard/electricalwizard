@@ -7,6 +7,10 @@ import {
 import { User } from '#/models/User.js';
 import { formatNameWithInitials } from '#/utils/formatName.js';
 import { escapeRegex } from '#/utils/regex.js';
+import { cacheFor } from '#/utils/cacheFor.js';
+
+// Autocomplete runs on every keystroke, so its lists are reused for a minute
+const AUTOCOMPLETE_TTL_MS = 60_000;
 
 export interface AddQuoteData {
   guildId: string;
@@ -176,43 +180,71 @@ export function canDeleteQuote(
 /**
  * Get users with names set for autocomplete
  */
-export async function getUsersWithNames(): Promise<
-  Array<{ discordId: string; displayName: string }>
-> {
-  const users = await User.find({
-    $or: [
-      {
-        'name.first': { $exists: true },
-        $and: [{ 'name.first': { $ne: null } }, { 'name.first': { $ne: '' } }],
-      },
-      {
-        'name.last': { $exists: true },
-        $and: [{ 'name.last': { $ne: null } }, { 'name.last': { $ne: '' } }],
-      },
-    ],
-  })
-    .select({ discordId: 1, name: 1 })
-    .lean();
+export const getUsersWithNames = cacheFor(
+  AUTOCOMPLETE_TTL_MS,
+  async (): Promise<Array<{ discordId: string; displayName: string }>> => {
+    const users = await User.find({
+      $or: [
+        {
+          'name.first': { $exists: true },
+          $and: [
+            { 'name.first': { $ne: null } },
+            { 'name.first': { $ne: '' } },
+          ],
+        },
+        {
+          'name.last': { $exists: true },
+          $and: [{ 'name.last': { $ne: null } }, { 'name.last': { $ne: '' } }],
+        },
+      ],
+    })
+      .select({ discordId: 1, name: 1 })
+      .lean();
 
-  return users.map((user) => ({
-    discordId: user.discordId,
-    displayName: formatNameWithInitials(user.name?.first, user.name?.last),
-  }));
+    return users.map((user) => ({
+      discordId: user.discordId,
+      displayName: formatNameWithInitials(user.name?.first, user.name?.last),
+    }));
+  },
+);
+
+export interface QuoteAuthor {
+  authorId: string;
+  count: number;
+  /** The author's name if set, otherwise their username. */
+  displayName: string;
 }
 
 /**
- * Get quote authors for autocomplete (users who have quotes)
+ * Users who have quotes in a guild, most quoted first, for autocomplete
  */
-export async function getQuoteAuthors(
-  guildId: string,
-): Promise<Array<{ authorId: string; count: number }>> {
-  return Quote.aggregate([
-    { $match: { guildId, authorId: { $exists: true, $ne: null } } },
-    { $group: { _id: '$authorId', count: { $sum: 1 } } },
-    { $project: { authorId: '$_id', count: 1, _id: 0 } },
-    { $sort: { count: -1 } },
-  ]);
-}
+export const getQuoteAuthors = cacheFor(
+  AUTOCOMPLETE_TTL_MS,
+  async (guildId: string): Promise<QuoteAuthor[]> => {
+    const authors: Array<{ authorId: string; count: number }> =
+      await Quote.aggregate([
+        { $match: { guildId, authorId: { $exists: true, $ne: null } } },
+        { $group: { _id: '$authorId', count: { $sum: 1 } } },
+        { $project: { authorId: '$_id', count: 1, _id: 0 } },
+        { $sort: { count: -1 } },
+      ]);
+    const users = await User.find(
+      { discordId: { $in: authors.map((a) => a.authorId) } },
+      { discordId: 1, username: 1, name: 1 },
+    ).lean();
+    const usersById = new Map(users.map((u) => [u.discordId, u]));
+
+    return authors.map((author) => {
+      const user = usersById.get(author.authorId);
+      return {
+        ...author,
+        displayName: user?.name?.first
+          ? formatNameWithInitials(user.name.first, user.name.last)
+          : (user?.username ?? 'Unknown'),
+      };
+    });
+  },
+);
 
 /**
  * Fill in contentKey for quotes saved before it existed. Runs at startup and
