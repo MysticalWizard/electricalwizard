@@ -14,6 +14,18 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
+  // Reply to a deleted message as a plain message instead of failing
+  failIfNotExists: false,
+});
+
+client.on('error', (error) => {
+  console.error('Discord client error:', error);
+});
+
+// A stray rejection is logged rather than ending the process, which would
+// take the bot offline until pm2 restarts it.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
 });
 
 client.commands = new Collection();
@@ -29,4 +41,7 @@ async function main() {
   await client.login(config.botToken);
 }
 
-main();
+main().catch((error: unknown) => {
+  console.error('Failed to start the bot:', error);
+  process.exit(1);
+});

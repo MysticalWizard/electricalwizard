@@ -46,10 +46,18 @@ export async function loadEvents(client: Client): Promise<void> {
       event: Event<keyof ClientEvents>;
     };
 
+    // discord.js re-emits a listener's rejected promise as an 'error' event,
+    // so an error escaping a handler would otherwise end the process.
+    const run = (...args: ClientEvents[keyof ClientEvents]) => {
+      Promise.resolve(event.execute(...args)).catch((error: unknown) => {
+        console.error(`Unhandled error in ${event.name} handler:`, error);
+      });
+    };
+
     if (event.once) {
-      client.once(event.name, (...args) => event.execute(...args));
+      client.once(event.name, run);
     } else {
-      client.on(event.name, (...args) => event.execute(...args));
+      client.on(event.name, run);
     }
 
     console.log(chalk.magenta(`  ⌁ ${event.name}`));

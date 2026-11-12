@@ -44,10 +44,18 @@ export const event: Event<Events.InteractionCreate> = {
         flags: MessageFlags.Ephemeral,
       };
 
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(errorMessage);
-      } else {
-        await interaction.reply(errorMessage);
+      // The reply fails too if the interaction has expired
+      try {
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(errorMessage);
+        } else {
+          await interaction.reply(errorMessage);
+        }
+      } catch (replyError) {
+        console.error(
+          `Failed to report the error for ${interaction.commandName}:`,
+          replyError,
+        );
       }
     }
   },
