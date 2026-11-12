@@ -48,6 +48,9 @@ interface TranslationResult {
   targetLangEmoji: string | null;
 }
 
+// Long enough for a long message, short enough that the user is still waiting
+const REQUEST_TIMEOUT_MS = 30_000;
+
 async function fetchTranslation(
   text: string,
   targetLang: string,
@@ -59,7 +62,7 @@ async function fetchTranslation(
       Authorization: `Bearer ${config.translationApiKey}`,
     },
     body: JSON.stringify({ text, target_lang: targetLang }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {

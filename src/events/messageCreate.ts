@@ -13,6 +13,7 @@ import {
   getFormattedUserName,
 } from '#/utils/formatName.js';
 import { createEmbed } from '#/utils/embeds.js';
+import { Cooldown } from '#/utils/cooldown.js';
 
 const QUOTE_REGEX = /^quote(?:\s+(.+))?$/i;
 const TRANSLATE_REGEX = /^(?:translate|tr|tl)(?:\s+(.+))?$/i;
@@ -21,6 +22,19 @@ const TRANSLATE_REGEX = /^(?:translate|tr|tl)(?:\s+(.+))?$/i;
 // per-message value replaces the client's default rather than merging with
 // it, so `parse` has to be repeated here.
 const NO_PINGS: MessageMentionOptions = { parse: [], repliedUser: false };
+
+// Each translation is a call to a rate-limited API that can take a while, so
+// a user may start one every few seconds and only a few run at once
+const translateCooldown = new Cooldown(5_000);
+const MAX_ACTIVE_TRANSLATIONS = 3;
+let activeTranslations = 0;
+// Language names and codes are short; anything longer is a prompt
+const MAX_LANG_ARG_LENGTH = 64;
+
+/** Mark a trigger that was ignored for coming too soon. */
+async function reactTooSoon(message: Message): Promise<void> {
+  await message.react('⏳').catch(() => {});
+}
 
 async function handleQuoteReply(
   message: Message<true>,
@@ -96,6 +110,22 @@ async function handleTranslateReply(
   message: Message<true>,
   langArg?: string,
 ): Promise<void> {
+  if (langArg && langArg.length > MAX_LANG_ARG_LENGTH) {
+    await message.reply({
+      content: `Give a language name or code of up to ${MAX_LANG_ARG_LENGTH} characters.`,
+      allowedMentions: NO_PINGS,
+    });
+    return;
+  }
+  if (
+    activeTranslations >= MAX_ACTIVE_TRANSLATIONS ||
+    translateCooldown.take(message.author.id) > 0
+  ) {
+    await reactTooSoon(message);
+    return;
+  }
+
+  activeTranslations++;
   let succeeded = false;
   try {
     const referencedMessage = await message.channel.messages.fetch(
@@ -137,6 +167,7 @@ async function handleTranslateReply(
       allowedMentions: NO_PINGS,
     });
   } finally {
+    activeTranslations--;
     countTranslation(message.guildId, succeeded).catch((error: unknown) => {
       console.error('Failed to count translation:', error);
     });
